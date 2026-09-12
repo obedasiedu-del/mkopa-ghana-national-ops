@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>M-KOPA Ghana Field Ops (Retail)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div id="root"></div>
+<div id="toast-stack"></div>
+
+<!-- React + ReactDOM: self-hosted (assembled offline from local node_modules — see
+     build-react-bundle.js) so the page has no CDN dependency for its core UI framework. -->
+<script src="vendor-react.js"></script>
+<!-- Supabase JS client (UMD build) — the one CDN dependency this page has, for the shared
+     realtime database. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+
+<!-- App code, precompiled from src/*.js (JSX) to plain JS by build.js — no in-browser
+     transform needed at runtime. Load order matters: later files reference globals defined
+     by earlier ones. -->
+<script src="dist/lib-logic.js"></script>
+<script src="dist/lib-selectors.js"></script>
+<script src="dist/hooks-useSupabaseData.js"></script>
+<script src="dist/ui.js"></script>
+<script src="dist/context.js"></script>
+<script src="dist/DepotTable.js"></script>
+<script src="dist/ghana-map-data.js"></script>
+<script src="dist/GhanaMap.js"></script>
+<script src="dist/OverviewTab.js"></script>
+<script src="dist/CceTab.js"></script>
+<script src="dist/DevicesTab.js"></script>
+<script src="dist/DepotDrawer.js"></script>
+<script src="dist/modal-CceModal.js"></script>
+<script src="dist/modal-SubmissionModal.js"></script>
+<script src="dist/modal-LedgerModal.js"></script>
+<script src="dist/modal-BulkLedgerModal.js"></script>
+<script src="dist/modal-AgentLedgerModal.js"></script>
+<script src="dist/modal-ClearLedgerConfirm.js"></script>
+<script src="dist/ModalHost.js"></script>
+<script src="dist/App.js"></script>
+<script src="dist/main.js"></script>
+</body>
+</html>
