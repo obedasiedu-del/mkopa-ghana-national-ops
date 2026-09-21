@@ -27,7 +27,7 @@ function chunkArr(arr, size) {
 
 export function useAppData() {
   const [depots, setDepots] = React.useState({});
-  const [depotStock, setDepotStock] = React.useState({});
+  const [stockBalances, setStockBalances] = React.useState({});
   const [submissionsByDepot, setSubmissionsByDepot] = React.useState({});
   const [ledgerBaseline, setLedgerBaseline] = React.useState({});
   const [deviceLedger, setDeviceLedger] = React.useState({});
@@ -47,11 +47,17 @@ export function useAppData() {
     });
     setDepots(map);
   }, []);
-  const refreshDepotStock = React.useCallback(async () => {
-    const rows = await fetchAll("depot_stock");
+  // Devices at Depot is computed, not edited: depot_stock_balances is a view rolling up
+  // stock_movements into Received / Issued / Remaining per depot+model (see the
+  // movement-derived-stock migration). Keyed depots[code][model] = { received, issued, remaining }.
+  const refreshStockBalances = React.useCallback(async () => {
+    const rows = await fetchAll("depot_stock_balances");
     const map = {};
-    rows.forEach((r) => { map[r.depot_code] = r.models || {}; });
-    setDepotStock(map);
+    rows.forEach((r) => {
+      if (!map[r.depot_code]) map[r.depot_code] = {};
+      map[r.depot_code][r.model] = { received: r.received || 0, issued: r.issued || 0, remaining: r.remaining || 0 };
+    });
+    setStockBalances(map);
   }, []);
   const refreshSubmissions = React.useCallback(async () => {
     const rows = await fetchAll("submissions", "date");
@@ -87,14 +93,14 @@ export function useAppData() {
     let cancelled = false;
     (async () => {
       try {
-        await Promise.all([refreshDepots(), refreshDepotStock(), refreshSubmissions(), refreshLedgerBaseline(), refreshDeviceLedger()]);
+        await Promise.all([refreshDepots(), refreshStockBalances(), refreshSubmissions(), refreshLedgerBaseline(), refreshDeviceLedger()]);
         if (!cancelled) setLoaded(true);
       } catch (e) {
         if (!cancelled) setDbError(e);
       }
     })();
     return () => { cancelled = true; };
-  }, [refreshDepots, refreshDepotStock, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger]);
+  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger]);
 
   // Debounced realtime refresh -- a bulk paste can insert thousands of device_ledger rows in one
   // go, and Postgres realtime fires one event PER row; without coalescing, that would trigger
@@ -102,7 +108,7 @@ export function useAppData() {
   // table collapses into a single refetch ~350ms after the last one.
   const timers = React.useRef({});
   const refreshers = {
-    depots: refreshDepots, depot_stock: refreshDepotStock,
+    depots: refreshDepots, stock_movements: refreshStockBalances,
     submissions: refreshSubmissions, device_ledger_baseline: refreshLedgerBaseline, device_ledger: refreshDeviceLedger,
   };
   React.useEffect(() => {
@@ -130,27 +136,6 @@ export function useAppData() {
     if (error) throw error;
     await refreshDepots();
   }, [refreshDepots]);
-
-  const saveDeviceModels = React.useCallback(async (depotCode, modelsObj) => {
-    const { error } = await supabaseClient.from("depot_stock").upsert({
-      depot_code: depotCode, models: modelsObj, updated_at: new Date().toISOString(),
-    });
-    if (error) throw error;
-    await refreshDepotStock();
-  }, [refreshDepotStock]);
-  const saveDepotStockBulk = React.useCallback(async (byDepotModels) => {
-    const codes = Object.keys(byDepotModels);
-    if (!codes.length) throw new Error("No matched depots to save yet — check the depot names.");
-    for (const batch of chunkArr(codes, 50)) {
-      const rows = batch.map((code) => ({
-        depot_code: code, models: byDepotModels[code], updated_at: new Date().toISOString(),
-      }));
-      const { error } = await supabaseClient.from("depot_stock").upsert(rows);
-      if (error) throw error;
-    }
-    await refreshDepotStock();
-    return codes.length;
-  }, [refreshDepotStock]);
 
   const saveSubmission = React.useCallback(async (depotCode, dateStr, submittedBy, modelsObj) => {
     const { error } = await supabaseClient.from("submissions").upsert(
@@ -213,9 +198,16 @@ export function useAppData() {
   // held in global state -- both tables grow unboundedly (every device_ledger/depot_stock/
   // submissions/depots change writes an audit_log row via trigger) so eagerly loading them
   // the way the other tables are loaded would not scale.
-  const fetchMovements = React.useCallback(async ({ depotCode, limit = 200 } = {}) => {
+  const fetchMovements = React.useCallback(async ({ depotCode, depotCodes, model, sinceIso, untilIso, limit = 200 } = {}) => {
     let q = supabaseClient.from("stock_movements").select("*").order("moved_at", { ascending: false }).limit(limit);
     if (depotCode) q = q.or(`depot_code.eq.${depotCode},to_depot_code.eq.${depotCode}`);
+    else if (depotCodes && depotCodes.length) {
+      const list = depotCodes.join(",");
+      q = q.or(`depot_code.in.(${list}),to_depot_code.in.(${list})`);
+    }
+    if (model) q = q.eq("model", model);
+    if (sinceIso) q = q.gte("moved_at", sinceIso);
+    if (untilIso) q = q.lte("moved_at", untilIso);
     const { data, error } = await q;
     if (error) throw error;
     return (data || []).map((r) => ({
@@ -224,23 +216,71 @@ export function useAppData() {
       movedAt: r.moved_at, recordedBy: r.recorded_by,
     }));
   }, []);
+  // Client-side checks catch the common mistakes with a clear message; the DB trigger
+  // (fn_check_stock_movement_quantity) is the actual source of truth and also blocks
+  // writes made outside this app, e.g. direct API calls.
+  function validateMovementPayload(payload) {
+    if (!payload.depotCode) throw new Error("A depot is required");
+    if (!payload.model || !payload.model.trim()) throw new Error("A device model is required");
+    if (!Number.isFinite(payload.quantity) || payload.quantity <= 0) throw new Error("Quantity must be a positive number");
+    if (payload.movementType === "transfer" && !payload.toDepotCode) throw new Error("A destination depot is required for a transfer");
+  }
   const recordMovement = React.useCallback(async (payload) => {
+    validateMovementPayload(payload);
     const { error } = await supabaseClient.from("stock_movements").insert({
-      depot_code: payload.depotCode || null,
+      depot_code: payload.depotCode,
       to_depot_code: payload.toDepotCode || null,
       serial: payload.serial || null,
-      model: payload.model || null,
-      quantity: payload.quantity ?? 1,
+      model: payload.model.trim(),
+      quantity: payload.quantity,
       movement_type: payload.movementType,
       reference: payload.reference || null,
       moved_at: payload.movedAt || new Date().toISOString(),
       recorded_by: payload.recordedBy || null,
     });
     if (error) throw error;
+    await refreshStockBalances();
+  }, [refreshStockBalances]);
+  // Used by the "Upload Stock (All Depots)" bulk paste: one receipt movement per
+  // depot+model with a nonzero In Stock count, one return movement per nonzero Returned
+  // count. Runs as a single batched insert per chunk, same pattern as the device-ledger
+  // bulk upload.
+  const recordReceiptsBulk = React.useCallback(async (byDepotModels, recordedBy) => {
+    const rows = [];
+    Object.keys(byDepotModels).forEach((depotCode) => {
+      Object.keys(byDepotModels[depotCode]).forEach((model) => {
+        const { inStock, returned } = byDepotModels[depotCode][model];
+        if (inStock > 0) rows.push({ depot_code: depotCode, model, quantity: inStock, movement_type: "receipt", reference: "Bulk stock upload", recorded_by: recordedBy || null });
+        if (returned > 0) rows.push({ depot_code: depotCode, model, quantity: returned, movement_type: "return", reference: "Bulk stock upload", recorded_by: recordedBy || null });
+      });
+    });
+    if (!rows.length) throw new Error("No positive quantities to save — check the pasted data.");
+    for (const batch of chunkArr(rows, 500)) {
+      const { error } = await supabaseClient.from("stock_movements").insert(batch);
+      if (error) throw error;
+    }
+    await refreshStockBalances();
+    return rows.length;
+  }, [refreshStockBalances]);
+  // Lightweight counts for the National/Region "Stock Movement" KPI -- a head-only count
+  // query rather than pulling rows, so this stays cheap regardless of history size.
+  const fetchMovementCount = React.useCallback(async ({ depotCodes, sinceIso } = {}) => {
+    let q = supabaseClient.from("stock_movements").select("id", { count: "exact", head: true });
+    if (depotCodes && depotCodes.length) {
+      const list = depotCodes.join(",");
+      q = q.or(`depot_code.in.(${list}),to_depot_code.in.(${list})`);
+    }
+    if (sinceIso) q = q.gte("moved_at", sinceIso);
+    const { count, error } = await q;
+    if (error) throw error;
+    return count || 0;
   }, []);
-  const fetchAuditLog = React.useCallback(async ({ depotCode, limit = 200 } = {}) => {
+  const fetchAuditLog = React.useCallback(async ({ depotCode, depotCodes, sinceIso, untilIso, limit = 200 } = {}) => {
     let q = supabaseClient.from("audit_log").select("*").order("occurred_at", { ascending: false }).limit(limit);
     if (depotCode) q = q.eq("depot_code", depotCode);
+    else if (depotCodes && depotCodes.length) q = q.in("depot_code", depotCodes);
+    if (sinceIso) q = q.gte("occurred_at", sinceIso);
+    if (untilIso) q = q.lte("occurred_at", untilIso);
     const { data, error } = await q;
     if (error) throw error;
     return (data || []).map((r) => ({
@@ -250,10 +290,10 @@ export function useAppData() {
   }, []);
 
   return {
-    depots, depotStock, submissionsByDepot, ledgerBaseline, deviceLedger,
+    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger,
     loaded, dbError, pseudoCodes: PSEUDO_CODES,
-    saveDepotField, saveDeviceModels, saveDepotStockBulk, saveSubmission,
+    saveDepotField, saveSubmission,
     saveLedgerBaseline, saveLedgerBaselineBulk, clearAllDeviceLedger, updateDeviceStatus,
-    fetchMovements, recordMovement, fetchAuditLog,
+    fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, fetchAuditLog,
   };
 }

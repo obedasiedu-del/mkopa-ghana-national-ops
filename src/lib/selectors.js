@@ -1,5 +1,5 @@
 "use strict";
-import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, deviceTotals, countsForDevices, submissionTotals, todayStr } from "./domain.js";
+import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, submissionTotals, todayStr } from "./domain.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
 
@@ -38,6 +38,17 @@ export function movementsForScope(movements, depots, scope) {
   if (scope === "national") return movements;
   return movements.filter((m) => codes.has(m.depotCode) || codes.has(m.toDepotCode));
 }
+// Devices at Depot totals for one depot: { received, issued, remaining } summed across models.
+export function depotStockTotals(stockBalances, depotCode) {
+  const models = stockBalances[depotCode] || {};
+  const totals = { received: 0, issued: 0, remaining: 0 };
+  Object.values(models).forEach((m) => {
+    totals.received += m.received || 0;
+    totals.issued += m.issued || 0;
+    totals.remaining += m.remaining || 0;
+  });
+  return totals;
+}
 // Rolled-up KPIs for a scope (national or one region): active depots, SC coverage, devices
 // tracked at depot, device-ledger aging counts, and today's daily-submission coverage.
 export function overviewStats(data, scope) {
@@ -45,7 +56,7 @@ export function overviewStats(data, scope) {
   const active = activeDepots(depots);
   const filled = active.filter((d) => d.scStatus === "active");
   let deviceTotal = 0;
-  depots.forEach((d) => { deviceTotal += deviceTotals(data.depotStock[d.code]).total; });
+  depots.forEach((d) => { deviceTotal += depotStockTotals(data.stockBalances, d.code).remaining; });
   const ledgerDepots = ledgerDepotsForScope(data.depots, scope);
   let ledgerCounts = { total: 0, fresh: 0, projected: 0, aged: 0, urgent: 0, highrisk: 0, reallocated: 0, returned: 0 };
   ledgerDepots.forEach((d) => {
@@ -64,6 +75,25 @@ export function overviewStats(data, scope) {
     deviceTotal, ledgerCounts,
     submittedToday, expectedSubmissions: active.length,
   };
+}
+
+// Daily movement counts for the last `days` days (today inclusive), zero-filled so a
+// quiet day still shows as a point rather than a gap. `rows` is whatever fetchMovements
+// returned for the same window.
+export function bucketMovementsByDay(rows, days) {
+  const counts = {};
+  rows.forEach((m) => {
+    const day = String(m.movedAt).slice(0, 10);
+    counts[day] = (counts[day] || 0) + 1;
+  });
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    out.push({ date: key, count: counts[key] || 0 });
+  }
+  return out;
 }
 
 export function auditForScope(auditLog, depots, scope) {

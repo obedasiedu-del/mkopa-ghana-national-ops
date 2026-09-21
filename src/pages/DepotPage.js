@@ -2,10 +2,11 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { canWriteDepot } from "../data/useAuth.js";
-import { KpiTile, Pill, ScStatusPill, ScoreCell, FieldInput, FieldSelect, FieldTextarea, EmptyRow, Tabs, Breadcrumb, LedgerAgingBadge } from "../components/ui.js";
-import { ledgerDevices } from "../lib/selectors.js";
+import { KpiTile, Pill, ScStatusPill, ScoreCell, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, LedgerAgingBadge } from "../components/ui.js";
+import { DataTable } from "../components/DataTable.js";
+import { ledgerDevices, depotStockTotals } from "../lib/selectors.js";
 import {
-  DEVICE_MODEL_SUGGESTIONS, SUBMISSION_MODELS, LEDGER_TIERS, deviceTotals, submissionTotals, todayStr,
+  SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
   fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, ledgerTierFor, countsForDevices,
   groupDevicesByTier, downloadCsv,
 } from "../lib/domain.js";
@@ -66,12 +67,10 @@ function DevicesTab({ rec, canWrite }) {
     const scoreVal = scScore.trim() === "" ? null : Math.max(0, Math.min(100, Number(scScore)));
     runAction(() => data.saveDepotField(rec.code, { scName: scName.trim(), scPhone: scPhone.trim(), scStatus, scScore: scoreVal, scNotes: scNotes.trim() }), "Saved");
   }
-  const models = { ...(data.depotStock[rec.code] || {}) };
-  DEVICE_MODEL_SUGGESTIONS.forEach((m) => { if (!models[m]) models[m] = { inStock: 0, returned: 0 }; });
-  const [modelState, setModelState] = React.useState(models);
-  React.useEffect(() => { setModelState({ ...(data.depotStock[rec.code] || {}) }); }, [data.depotStock, rec.code]);
-  const [newModel, setNewModel] = React.useState("");
-  function saveModels() { runAction(() => data.saveDeviceModels(rec.code, modelState), "Stock updated"); }
+
+  const balances = data.stockBalances[rec.code] || {};
+  const models = Object.keys(balances).sort();
+  const depotTotals = depotStockTotals(data.stockBalances, rec.code);
 
   const ledgerDvs = ledgerDevices(data.deviceLedger, rec.code);
   const counts = countsForDevices(ledgerDvs);
@@ -91,21 +90,25 @@ function DevicesTab({ rec, canWrite }) {
           React.createElement(FieldInput, { label: "Score (0–100)", value: scScore, onChange: setScScore, type: "number" })),
         React.createElement(FieldTextarea, { label: "Notes", value: scNotes, onChange: setScNotes }),
         canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveSc }, "Save Stock Controller")),
-      React.createElement("div", { className: "table-wrap", style: { padding: "14px 16px" } },
-        React.createElement("div", { className: "drawer-section-title" }, "Device stock by model"),
-        React.createElement("div", { className: "device-model-head" },
-          React.createElement("div", null, "Model"), React.createElement("div", null, "In stock"), React.createElement("div", null, "Returned"), React.createElement("div", null)),
-        React.createElement("div", null, Object.keys(modelState).map((m) => React.createElement("div", { className: "device-model-row", key: m },
-          React.createElement("input", { className: "field-input mono", value: m, disabled: true }),
-          React.createElement("input", { className: "field-input mono", type: "number", min: "0", value: modelState[m].inStock || 0, disabled: !canWrite, onChange: (e) => setModelState({ ...modelState, [m]: { ...modelState[m], inStock: Number(e.target.value) || 0 } }) }),
-          React.createElement("input", { className: "field-input mono", type: "number", min: "0", value: modelState[m].returned || 0, disabled: !canWrite, onChange: (e) => setModelState({ ...modelState, [m]: { ...modelState[m], returned: Number(e.target.value) || 0 } }) }),
-          canWrite && React.createElement("button", { className: "icon-btn", title: "Remove model", onClick: () => { const m2 = { ...modelState }; delete m2[m]; setModelState(m2); } }, "✕")))),
-        canWrite && React.createElement(React.Fragment, null,
-          React.createElement("div", { style: { display: "flex", gap: 6, marginTop: 8 } },
-            React.createElement("input", { className: "field-input", placeholder: "Add model (e.g. A26)", list: "model-suggestions", value: newModel, onChange: (e) => setNewModel(e.target.value) }),
-            React.createElement("datalist", { id: "model-suggestions" }, DEVICE_MODEL_SUGGESTIONS.map((m) => React.createElement("option", { value: m, key: m }))),
-            React.createElement("button", { className: "btn btn-sm", onClick: () => { const m = newModel.trim(); if (!m) return; if (!modelState[m]) setModelState({ ...modelState, [m]: { inStock: 0, returned: 0 } }); setNewModel(""); } }, "Add")),
-          React.createElement("button", { className: "btn btn-primary btn-sm", style: { marginTop: 12 }, onClick: saveModels }, "Save device stock"))))
+      React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
+        React.createElement(KpiTile, { label: "Available (remaining)", value: fmtNum(depotTotals.remaining), foot: "current balance" }),
+        React.createElement(KpiTile, { label: "Received", value: fmtNum(depotTotals.received), foot: "all-time, this depot" }),
+        React.createElement(KpiTile, { label: "Issued", value: fmtNum(depotTotals.issued), foot: "all-time, this depot" })),
+      React.createElement("div", { className: "table-wrap" },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px 0" } },
+          React.createElement("div", { className: "drawer-section-title", style: { marginBottom: 0 } }, "Stock by model"),
+          canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => openModal("recordMovement", { depotCode: rec.code }) }, "+ Record Movement")),
+        models.length === 0
+          ? React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No stock movements recorded yet for this depot. Use \"Record Movement\" to log a receipt.")
+          : React.createElement("table", null,
+            React.createElement("thead", null, React.createElement("tr", null,
+              React.createElement("th", null, "Model"), React.createElement("th", { className: "num" }, "Available"),
+              React.createElement("th", { className: "num" }, "Received"), React.createElement("th", { className: "num" }, "Issued"))),
+            React.createElement("tbody", null, models.map((m) => React.createElement("tr", { key: m },
+              React.createElement("td", { className: "mono" }, m),
+              React.createElement("td", { className: "num", style: { fontWeight: 600 } }, fmtNum(balances[m].remaining)),
+              React.createElement("td", { className: "num" }, fmtNum(balances[m].received)),
+              React.createElement("td", { className: "num" }, fmtNum(balances[m].issued))))))))
       : React.createElement(React.Fragment, null,
         React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
           React.createElement(KpiTile, { label: "Devices tracked", value: fmtNum(counts.total), foot: "with a DSR or resolved" }),
@@ -188,26 +191,25 @@ function MovementTab({ rec, canWrite }) {
   }, [data, rec.code]);
   React.useEffect(() => { load(); }, [load]);
 
+  const columns = React.useMemo(() => [
+    { key: "movedAt", label: "When", sortable: true, render: (m) => fmtDateTime(m.movedAt) },
+    { key: "movementType", label: "Type", sortable: true, render: (m) => React.createElement(Pill, { cls: "pill-muted" }, m.movementType.replace(/_/g, " ")) },
+    { key: "model", label: "Model / Serial", render: (m) => [m.model, m.serial].filter(Boolean).join(" · ") || "—" },
+    { key: "quantity", label: "Qty", numeric: true, sortable: true },
+    { key: "toDepotCode", label: "To / From", render: (m) => (m.toDepotCode ? (data.depots[m.toDepotCode]?.name || m.toDepotCode) : "—") },
+    { key: "reference", label: "Note", render: (m) => m.reference || "—" },
+    { key: "recordedBy", label: "By", sortable: true, render: (m) => m.recordedBy || "—" },
+  ], [data.depots]);
+
   return React.createElement(React.Fragment, null,
     React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 } },
-      React.createElement("div", { style: { fontSize: 12.8, color: "var(--text-muted)" } }, "Transfers, allocations, returns and other stock-moving events for this depot."),
+      React.createElement("div", { style: { fontSize: 12.8, color: "var(--text-muted)" } }, "Transfers, receipts, issues, returns and status changes for this depot."),
       canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => openModal("recordMovement", { depotCode: rec.code, onSaved: load }) }, "+ Record Movement")),
     loading ? React.createElement("div", { style: { padding: 20, color: "var(--text-faint)" } }, "Loading…")
-      : (!rows || rows.length === 0)
-        ? React.createElement("div", { className: "table-wrap" }, React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No movements recorded yet for this depot."))
-        : React.createElement("div", { className: "table-wrap" },
-          React.createElement("table", null,
-            React.createElement("thead", null, React.createElement("tr", null,
-              React.createElement("th", null, "When"), React.createElement("th", null, "Type"), React.createElement("th", null, "Model / Serial"),
-              React.createElement("th", { className: "num" }, "Qty"), React.createElement("th", null, "To / From"), React.createElement("th", null, "Note"), React.createElement("th", null, "By"))),
-            React.createElement("tbody", null, rows.map((m) => React.createElement("tr", { key: m.id },
-              React.createElement("td", null, fmtDateTime(m.movedAt)),
-              React.createElement("td", null, React.createElement(Pill, { cls: "pill-muted" }, m.movementType.replace(/_/g, " "))),
-              React.createElement("td", null, [m.model, m.serial].filter(Boolean).join(" · ") || "—"),
-              React.createElement("td", { className: "num" }, m.quantity ?? "—"),
-              React.createElement("td", null, m.toDepotCode ? (data.depots[m.toDepotCode]?.name || m.toDepotCode) : "—"),
-              React.createElement("td", null, m.reference || "—"),
-              React.createElement("td", null, m.recordedBy || "—")))))));
+      : React.createElement(DataTable, {
+        columns, rows: rows || [], rowKey: (m) => m.id, defaultSortKey: "movedAt", defaultSortDir: "desc",
+        emptyMessage: "No movements recorded yet for this depot.",
+      }));
 }
 
 /* ============ Stock Aging ============ */
@@ -225,18 +227,19 @@ function AgingTab({ rec }) {
         React.createElement("div", { className: "kpi-foot" }, t.min === undefined ? "0–" + t.max + " days" : t.max === undefined ? t.min + "+ days" : t.min + "–" + t.max + " days")))),
     activeTier && React.createElement(React.Fragment, null,
       React.createElement("div", { className: "drawer-section-title" }, LEDGER_TIERS.find((t) => t.key === activeTier).label, " devices"),
-      shown.length === 0
-        ? React.createElement("div", { className: "table-wrap" }, React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No devices in this tier."))
-        : React.createElement("div", { className: "table-wrap" },
-          React.createElement("table", null,
-            React.createElement("thead", null, React.createElement("tr", null,
-              React.createElement("th", null, "Serial"), React.createElement("th", null, "Product"), React.createElement("th", null, "DSR"), React.createElement("th", null, "Allocated"), React.createElement("th", null, "Days"))),
-            React.createElement("tbody", null, shown.map((dv) => React.createElement("tr", { key: dv.serial },
-              React.createElement("td", { className: "mono" }, dv.serial), React.createElement("td", null, dv.model || "—"),
-              React.createElement("td", null, dv.dsrName || "—"), React.createElement("td", null, fmtDateShort(dv.allocatedDate)),
-              React.createElement("td", null, daysAllocated(dv.allocatedDate)))))))),
+      React.createElement(DataTable, {
+        columns: AGING_COLUMNS, rows: shown, rowKey: (dv) => dv.serial, defaultSortKey: "allocatedDate",
+        emptyMessage: "No devices in this tier.",
+      })),
     !activeTier && React.createElement("div", { style: { fontSize: 12.5, color: "var(--text-faint)" } }, "Click a tier above to see its devices."));
 }
+const AGING_COLUMNS = [
+  { key: "serial", label: "Serial", sortable: true, render: (dv) => React.createElement("span", { className: "mono" }, dv.serial) },
+  { key: "model", label: "Product", sortable: true, render: (dv) => dv.model || "—" },
+  { key: "dsrName", label: "DSR", sortable: true, render: (dv) => dv.dsrName || "—" },
+  { key: "allocatedDate", label: "Allocated", sortable: true, render: (dv) => fmtDateShort(dv.allocatedDate) },
+  { key: "days", label: "Days", numeric: true, sortable: true, sortValue: (dv) => daysAllocated(dv.allocatedDate), render: (dv) => daysAllocated(dv.allocatedDate) },
+];
 
 /* ============ Audit History ============ */
 function AuditTab({ rec }) {
@@ -248,27 +251,26 @@ function AuditTab({ rec }) {
     data.fetchAuditLog({ depotCode: rec.code }).then(setRows).finally(() => setLoading(false));
   }, [data, rec.code]);
 
-  function summarize(row) {
-    if (row.action === "insert") return "Created";
-    if (row.action === "delete") return "Deleted";
-    if (!row.oldValue || !row.newValue) return "Updated";
-    const changed = Object.keys(row.newValue).filter((k) => JSON.stringify(row.oldValue[k]) !== JSON.stringify(row.newValue[k]));
-    return changed.length ? changed.map((k) => k + ": " + String(row.oldValue[k]) + " → " + String(row.newValue[k])).join(", ") : "No field changes";
-  }
+  const columns = React.useMemo(() => [
+    { key: "occurredAt", label: "When", sortable: true, render: (r) => fmtDateTime(r.occurredAt) },
+    { key: "tableName", label: "Table", sortable: true },
+    { key: "action", label: "Action", sortable: true, render: (r) => React.createElement(Pill, { cls: r.action === "insert" ? "pill-success" : r.action === "delete" ? "pill-critical" : "pill-warning" }, r.action) },
+    { key: "actor", label: "By", sortable: true, render: (r) => r.actor || "—" },
+    { key: "change", label: "Change", render: (r) => React.createElement("span", { style: { fontSize: 12, maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "inline-block" }, title: summarizeAudit(r) }, summarizeAudit(r)) },
+  ], []);
 
   return React.createElement(React.Fragment, null,
     React.createElement("div", { style: { fontSize: 12.8, color: "var(--text-muted)", marginBottom: 14 } }, "Every change to this depot's stock controller, stock, submissions and device ledger, captured automatically."),
     loading ? React.createElement("div", { style: { padding: 20, color: "var(--text-faint)" } }, "Loading…")
-      : (!rows || rows.length === 0)
-        ? React.createElement("div", { className: "table-wrap" }, React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No audit history yet."))
-        : React.createElement("div", { className: "table-wrap" },
-          React.createElement("table", null,
-            React.createElement("thead", null, React.createElement("tr", null,
-              React.createElement("th", null, "When"), React.createElement("th", null, "Table"), React.createElement("th", null, "Action"), React.createElement("th", null, "By"), React.createElement("th", null, "Change"))),
-            React.createElement("tbody", null, rows.map((r) => React.createElement("tr", { key: r.id },
-              React.createElement("td", null, fmtDateTime(r.occurredAt)),
-              React.createElement("td", null, r.tableName),
-              React.createElement("td", null, React.createElement(Pill, { cls: r.action === "insert" ? "pill-success" : r.action === "delete" ? "pill-critical" : "pill-warning" }, r.action)),
-              React.createElement("td", null, r.actor || "—"),
-              React.createElement("td", { style: { fontSize: 12, maxWidth: 420, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }, title: summarize(r) }, summarize(r))))))));
+      : React.createElement(DataTable, {
+        columns, rows: rows || [], rowKey: (r) => r.id, defaultSortKey: "occurredAt", defaultSortDir: "desc",
+        emptyMessage: "No audit history yet.",
+      }));
+}
+function summarizeAudit(row) {
+  if (row.action === "insert") return "Created";
+  if (row.action === "delete") return "Deleted";
+  if (!row.oldValue || !row.newValue) return "Updated";
+  const changed = Object.keys(row.newValue).filter((k) => JSON.stringify(row.oldValue[k]) !== JSON.stringify(row.newValue[k]));
+  return changed.length ? changed.map((k) => k + ": " + String(row.oldValue[k]) + " → " + String(row.newValue[k])).join(", ") : "No field changes";
 }

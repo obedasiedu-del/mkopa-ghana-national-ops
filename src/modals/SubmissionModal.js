@@ -6,7 +6,7 @@ import { depotsForScope } from "../lib/selectors.js";
 import { SUBMISSION_MODELS, todayStr, fmtDateShort, submissionTotals, agedPctColor, downloadCsv } from "../lib/domain.js";
 
 export function SubmissionModal({ depotCode: initialCode }) {
-  const { data, closeModal, runAction } = useApp();
+  const { data, closeModal, runAction, toast } = useApp();
   const depotOptions = React.useMemo(() => depotsForScope(data.depots, "national").filter((d) => d.status === "active"), [data.depots]);
   const defaultCode = initialCode || (depotOptions[0] || {}).code || "";
   const [depotCode, setDepotCode] = React.useState(defaultCode);
@@ -33,9 +33,17 @@ export function SubmissionModal({ depotCode: initialCode }) {
     setAgeds(a);
   }
   function submit() {
+    if (!name.trim()) { toast("Your name is required"); return; }
     const modelsObj = {};
-    SUBMISSION_MODELS.forEach((m) => { modelsObj[m] = { totalStock: Number(totals[m]) || 0, agedStock: Number(ageds[m]) || 0 }; });
-    if (!name.trim()) return;
+    for (const m of SUBMISSION_MODELS) {
+      const totalStock = Math.max(0, Number(totals[m]) || 0);
+      const agedStock = Math.max(0, Number(ageds[m]) || 0);
+      if (agedStock > totalStock) {
+        toast(`${m}: aged stock (${agedStock}) can't exceed total stock (${totalStock})`);
+        return;
+      }
+      modelsObj[m] = { totalStock, agedStock };
+    }
     runAction(() => data.saveSubmission(depotCode, today, name, modelsObj), "Submission saved").then(closeModal);
   }
   function exportHistory() {
@@ -68,11 +76,11 @@ export function SubmissionModal({ depotCode: initialCode }) {
     React.createElement("div", { className: "drawer-section-title", style: { color: "var(--success)", marginTop: 6 } }, "Total Stock"),
     React.createElement("div", { className: "model-grid" }, SUBMISSION_MODELS.map((m) => React.createElement("div", { className: "field-row", key: m },
       React.createElement("div", { className: "field-label" }, m),
-      React.createElement("input", { className: "field-input", type: "number", value: totals[m], onChange: (e) => setTotals({ ...totals, [m]: e.target.value }) })))),
+      React.createElement("input", { className: "field-input", type: "number", min: "0", value: totals[m], onChange: (e) => setTotals({ ...totals, [m]: e.target.value }) })))),
     React.createElement("div", { className: "drawer-section-title", style: { color: "var(--warning)", marginTop: 10 } }, "Aged Stock"),
     React.createElement("div", { className: "model-grid" }, SUBMISSION_MODELS.map((m) => React.createElement("div", { className: "field-row", key: m },
       React.createElement("div", { className: "field-label" }, m),
-      React.createElement("input", { className: "field-input", type: "number", value: ageds[m], onChange: (e) => setAgeds({ ...ageds, [m]: e.target.value }) })))),
+      React.createElement("input", { className: "field-input", type: "number", min: "0", value: ageds[m], onChange: (e) => setAgeds({ ...ageds, [m]: e.target.value }) })))),
     historyDays.length > 0 && React.createElement("div", { style: { marginTop: 16 } },
       React.createElement("div", { className: "drawer-section-title" },
         "Daily totals — ", data.depots[depotCode] ? data.depots[depotCode].name : depotCode,

@@ -30,10 +30,10 @@ export function ScoreCell({ score }) {
       React.createElement("div", { className: "score-bar-fill", style: { width: pct + "%", background: color } })),
     React.createElement("div", { className: "score-num mono", style: { color } }, score === null || score === undefined ? "—" : String(score)));
 }
-export function FieldInput({ label, value, onChange, type = "text", placeholder }) {
+export function FieldInput({ label, value, onChange, type = "text", placeholder, min, max }) {
   return React.createElement("div", { className: "field-row" },
     React.createElement("div", { className: "field-label" }, label),
-    React.createElement("input", { className: "field-input", type, value: value ?? "", placeholder, onChange: (e) => onChange(e.target.value) }));
+    React.createElement("input", { className: "field-input", type, value: value ?? "", placeholder, min, max, onChange: (e) => onChange(e.target.value) }));
 }
 export function FieldTextarea({ label, value, onChange, rows, placeholder }) {
   return React.createElement("div", { className: "field-row" },
@@ -75,6 +75,30 @@ export function LedgerAgingBadge({ device }) {
   const tier = ledgerTierFor(days);
   if (!tier) return React.createElement("span", { style: { color: "var(--text-faint)" } }, "—");
   return React.createElement(Pill, { cls: tier.cls }, tier.label, days !== null ? " · " + days + "d" : "");
+}
+// Compact inline Region / Depot / Model / Date filter row, reused by the Stock Movement
+// and Audit History log pages. Any of the four is optional -- pass only what a given page
+// needs (e.g. Audit History has no model filter).
+export function FilterBar({
+  region, onRegionChange, regionOptions,
+  depotCode, onDepotChange, depotOptions,
+  model, onModelChange, modelOptions,
+  dateFrom, onDateFromChange, dateTo, onDateToChange,
+  onClear,
+}) {
+  return React.createElement("div", { className: "filter-bar" },
+    regionOptions && React.createElement("select", { className: "field-input filter-input", value: region || "", onChange: (e) => onRegionChange(e.target.value || null) },
+      React.createElement("option", { value: "" }, "All regions"),
+      regionOptions.map((r) => React.createElement("option", { key: r, value: r }, r))),
+    depotOptions && React.createElement("select", { className: "field-input filter-input", value: depotCode || "", onChange: (e) => onDepotChange(e.target.value || null) },
+      React.createElement("option", { value: "" }, "All depots"),
+      depotOptions.map((d) => React.createElement("option", { key: d.code, value: d.code }, d.name))),
+    modelOptions && React.createElement("select", { className: "field-input filter-input", value: model || "", onChange: (e) => onModelChange(e.target.value || null) },
+      React.createElement("option", { value: "" }, "All models"),
+      modelOptions.map((m) => React.createElement("option", { key: m, value: m }, m))),
+    onDateFromChange && React.createElement("input", { className: "field-input filter-input", type: "date", value: dateFrom || "", onChange: (e) => onDateFromChange(e.target.value || null), title: "From date" }),
+    onDateToChange && React.createElement("input", { className: "field-input filter-input", type: "date", value: dateTo || "", onChange: (e) => onDateToChange(e.target.value || null), title: "To date" }),
+    onClear && React.createElement("button", { className: "btn btn-ghost btn-sm", onClick: onClear }, "Clear filters"));
 }
 export function Tabs({ tabs, active, onChange }) {
   return React.createElement("div", { className: "tabs" }, tabs.map((t) => (

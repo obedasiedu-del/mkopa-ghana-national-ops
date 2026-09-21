@@ -1,18 +1,21 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { Modal } from "../components/ui.js";
+import { Modal, FieldInput } from "../components/ui.js";
 import { depotsForScope } from "../lib/selectors.js";
 import { parseDepotStockPaste, downloadCsv } from "../lib/domain.js";
 
-// Bulk paste for aggregate Depot Stock, mirroring the "Upload Baseline (All Depots)" flow in
-// Devices with DSRs -- paste once, rows are matched to a depot by name, and depots present in
-// the paste have their stock replaced (others untouched).
+// Bulk paste for Devices at Depot -- paste once, rows are matched to a depot by name, and
+// each nonzero In Stock / Returned count becomes a Receipt / Return movement (Devices at
+// Depot is computed from the movement log, not edited directly -- see the movement-derived
+// stock model). Pasting the same rows twice adds the stock twice, same as recording any
+// other movement twice; it does not "replace" a depot's balance.
 export function BulkDepotStockModal() {
   const { data, closeModal, toast, runAction } = useApp();
   const depots = depotsForScope(data.depots, "national");
   const depotsLoaded = depots.length > 0;
   const [text, setText] = React.useState("");
+  const [recordedBy, setRecordedBy] = React.useState("");
   const [summary, setSummary] = React.useState(null);
   const [parsing, setParsing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
@@ -28,11 +31,12 @@ export function BulkDepotStockModal() {
   }
   function onChange(e) { const value = e.target.value; setText(value); scheduleParse(value); }
   function saveStock() {
+    if (!recordedBy.trim()) { toast("Your name is required"); return; }
     setSaving(true);
     setTimeout(() => {
       const parsed = parseDepotStockPaste(text, depots);
-      runAction(() => data.saveDepotStockBulk(parsed.byDepot), null)
-        .then((count) => { toast("Stock saved for " + count + " depot" + (count === 1 ? "" : "s")); closeModal(); })
+      runAction(() => data.recordReceiptsBulk(parsed.byDepot, recordedBy.trim()), null)
+        .then((count) => { toast("Recorded " + count + " movement" + (count === 1 ? "" : "s")); closeModal(); })
         .catch(() => {})
         .finally(() => setSaving(false));
     }, 0);
@@ -48,10 +52,11 @@ export function BulkDepotStockModal() {
     !depotsLoaded && React.createElement("div", { className: "banner", style: { marginBottom: 10 } },
       React.createElement("span", null, "⚠"),
       React.createElement("div", null, "The depot list hasn't finished loading yet — pasting now would match nothing. Close this, wait a couple seconds, then reopen.")),
-    React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-muted)", marginBottom: 10 } }, "Paste depot stock rows — one row per depot + model. Columns: Depot (name or code), Model, In Stock, Returned. Each row is matched to a depot by name (same matching as Devices with DSRs); repeated rows for the same depot and model are summed. Depots present in this paste have their stock fully replaced — others are left untouched."),
+    React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-muted)", marginBottom: 10 } }, "Paste depot stock rows — one row per depot + model. Columns: Depot (name or code), Model, In Stock, Returned. Each row is matched to a depot by name (same matching as Devices with DSRs). Each nonzero In Stock count is recorded as a Receipt movement and each nonzero Returned count as a Return movement — this adds to a depot's current balance, it does not replace it."),
     React.createElement("div", { className: "field-row" },
       React.createElement("div", { className: "field-label" }, "Paste stock rows (all depots)"),
       React.createElement("textarea", { className: "field-input", rows: 10, placeholder: "Kasoa Depot\tA07/64\t12\t2\nCape Coast Depot\tA16/128\t5\t0", value: text, onChange })),
+    React.createElement(FieldInput, { label: "Recorded by (your name)", value: recordedBy, onChange: setRecordedBy }),
     React.createElement("div", { style: { fontSize: 12, margin: "4px 0 14px" } },
       parsing && React.createElement("div", { style: { color: "var(--text-faint)" } }, "Parsing…"),
       !parsing && !summary && React.createElement("div", { style: { color: "var(--text-faint)" } }, "Paste rows above to see a preview."),

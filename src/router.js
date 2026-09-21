@@ -10,6 +10,8 @@ import React from "react";
 //   #/region/:region                region overview
 //   #/depot/:code                   depot overview (defaults to the "devices" tab)
 //   #/depot/:code/:tab              depot page, one of: devices | submission | movement | aging | audit
+//   #/movements?region=X            Stock Movement log, national (no region) or one region, filterable
+//   #/audit?region=X                Audit History log, national (no region) or one region, filterable
 //   #/search?q=...                  cross-entity search results
 //   #/admin                         user role management (national_admin only)
 
@@ -23,6 +25,12 @@ function parseHash(hash) {
   }
   if (parts[0] === "depot" && parts[1]) {
     return { name: "depot", depotCode: parts[1], tab: parts[2] || "devices", query };
+  }
+  if (parts[0] === "movements") {
+    return { name: "movements", region: query.region || null, query };
+  }
+  if (parts[0] === "audit") {
+    return { name: "audit", region: query.region || null, query };
   }
   if (parts[0] === "search") {
     return { name: "search", query };
@@ -47,6 +55,8 @@ export function useRouter() {
   const goDepot = React.useCallback((code, tab) => navigate("#/depot/" + encodeURIComponent(code) + (tab ? "/" + tab : "")), [navigate]);
   const goSearch = React.useCallback((q) => navigate("#/search?q=" + encodeURIComponent(q)), [navigate]);
   const goAdmin = React.useCallback(() => navigate("#/admin"), [navigate]);
+  const goMovements = React.useCallback((region) => navigate("#/movements" + (region ? "?region=" + encodeURIComponent(region) : "")), [navigate]);
+  const goAudit = React.useCallback((region) => navigate("#/audit" + (region ? "?region=" + encodeURIComponent(region) : "")), [navigate]);
 
-  return { route, navigate, goNational, goRegion, goDepot, goSearch, goAdmin };
+  return { route, navigate, goNational, goRegion, goDepot, goSearch, goAdmin, goMovements, goAudit };
 }

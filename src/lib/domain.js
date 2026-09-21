@@ -12,22 +12,25 @@ export const HIGH_AGING_THRESHOLD = 30;
 export const INDIRECT_DEPOT = { code: "INDIRECT", name: "Indirect Channel (All Shops)", region: "National", status: "active" };
 export const UNRECOGNISED_DEPOT = { code: "UNRECOGNISED", name: "Unrecognised Shops", region: "National", status: "active" };
 export const PSEUDO_CODES = [INDIRECT_DEPOT.code, UNRECOGNISED_DEPOT.code];
+// Category names match the approved architecture exactly (Fresh / Projected / Aged /
+// Urgent / High Risk); day ranges are shown alongside them in the UI, not in the label.
 export const LEDGER_TIERS = [
   { key: "fresh", label: "Fresh", max: 5, cls: "pill-success" },
-  { key: "projected", label: "Projected Aging", min: 6, max: 10, cls: "pill-warning" },
+  { key: "projected", label: "Projected", min: 6, max: 10, cls: "pill-warning" },
   { key: "aged", label: "Aged", min: 11, max: 13, cls: "pill-critical" },
-  { key: "urgent", label: "Urgent Sale", min: 14, max: 29, cls: "pill-urgent" },
+  { key: "urgent", label: "Urgent", min: 14, max: 29, cls: "pill-urgent" },
   { key: "highrisk", label: "High Risk", min: 30, cls: "pill-severe" },
 ];
+// The 5 movement categories from the approved architecture (Transfers, Receipts, Issues,
+// Returns, Status changes). A more specific reason (e.g. "allocated to DSR", "sold",
+// "damaged") goes in the movement's free-text reference under 'issue' rather than being
+// its own type, keeping this list exactly matching the spec.
 export const MOVEMENT_TYPES = [
-  { key: "transfer_in", label: "Transfer In" },
-  { key: "transfer_out", label: "Transfer Out" },
-  { key: "allocated_to_dsr", label: "Allocated to DSR" },
-  { key: "returned_to_depot", label: "Returned to Depot" },
-  { key: "sold", label: "Sold" },
-  { key: "lost", label: "Lost" },
-  { key: "damaged", label: "Damaged" },
-  { key: "adjustment", label: "Adjustment" },
+  { key: "receipt", label: "Receipt" },
+  { key: "issue", label: "Issue" },
+  { key: "transfer", label: "Transfer" },
+  { key: "return", label: "Return" },
+  { key: "status_change", label: "Status Change" },
 ];
 export const USER_ROLES = [
   { key: "national_admin", label: "National Admin" },
@@ -69,17 +72,6 @@ export function agedPctColor(pct) {
 export function priorityLabel(pct) {
   if (pct === null || pct === undefined) return null;
   return pct >= HIGH_AGING_THRESHOLD ? "HIGH AGING" : "ON TRACK";
-}
-export function deviceTotals(models) {
-  const totals = { inStock: 0, returned: 0, total: 0 };
-  if (!models) return totals;
-  Object.keys(models).forEach((m) => {
-    const row = models[m] || {};
-    totals.inStock += Number(row.inStock) || 0;
-    totals.returned += Number(row.returned) || 0;
-  });
-  totals.total = totals.inStock + totals.returned;
-  return totals;
 }
 export function submissionTotals(entry) {
   const totals = { totalStock: 0, agedStock: 0 };

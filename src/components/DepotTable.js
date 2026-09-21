@@ -1,30 +1,31 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { EmptyRow, ScStatusPill, ScoreCell } from "./ui.js";
+import { ScStatusPill, ScoreCell } from "./ui.js";
+import { DataTable } from "./DataTable.js";
+
+const COLUMNS = [
+  {
+    key: "name", label: "Depot", sortable: true,
+    render: (d) => React.createElement("div", { className: "depot-name-cell" },
+      React.createElement("span", null, d.name),
+      React.createElement("span", { className: "code" }, d.code, d.status === "closed" ? " · closed" : "")),
+  },
+  { key: "region", label: "Region", sortable: true },
+  {
+    key: "scName", label: "Stock Controller", sortable: true,
+    render: (d) => d.scName || React.createElement("span", { style: { color: "var(--text-faint)" } }, "Unassigned"),
+  },
+  { key: "scStatus", label: "Status", sortable: true, render: (d) => React.createElement(ScStatusPill, { status: d.scStatus }) },
+  { key: "scScore", label: "Score", sortable: true, numeric: true, sortValue: (d) => d.scScore ?? -1, render: (d) => React.createElement(ScoreCell, { score: d.scScore }) },
+];
 
 export function DepotTable({ depots }) {
   const { search, goDepot } = useApp();
   const q = search.trim().toLowerCase();
   const filtered = depots.filter((d) => !q || (d.name + " " + d.code + " " + d.scName).toLowerCase().includes(q));
-  return React.createElement("div", { className: "table-wrap" },
-    React.createElement("table", null,
-      React.createElement("thead", null,
-        React.createElement("tr", null,
-          React.createElement("th", null, "Depot"),
-          React.createElement("th", null, "Region"),
-          React.createElement("th", null, "Stock Controller"),
-          React.createElement("th", null, "Status"),
-          React.createElement("th", null, "Score"))),
-      React.createElement("tbody", null,
-        filtered.length === 0 && React.createElement(EmptyRow, { colSpan: 5 }, "No depots match your search."),
-        filtered.map((d) => React.createElement("tr", { key: d.code, className: "clickable", onClick: () => goDepot(d.code) },
-          React.createElement("td", null,
-            React.createElement("div", { className: "depot-name-cell" },
-              React.createElement("span", null, d.name),
-              React.createElement("span", { className: "code" }, d.code, d.status === "closed" ? " · closed" : ""))),
-          React.createElement("td", null, d.region),
-          React.createElement("td", null, d.scName || React.createElement("span", { style: { color: "var(--text-faint)" } }, "Unassigned")),
-          React.createElement("td", null, React.createElement(ScStatusPill, { status: d.scStatus })),
-          React.createElement("td", null, React.createElement(ScoreCell, { score: d.scScore })))))));
+  return React.createElement(DataTable, {
+    columns: COLUMNS, rows: filtered, rowKey: (d) => d.code, onRowClick: (d) => goDepot(d.code),
+    emptyMessage: "No depots match your search.", defaultSortKey: "name",
+  });
 }
