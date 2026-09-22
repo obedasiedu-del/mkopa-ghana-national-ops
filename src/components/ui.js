@@ -1,6 +1,6 @@
 "use strict";
 import React from "react";
-import { scoreColor, daysAllocated, ledgerTierFor } from "../lib/domain.js";
+import { scoreColor, daysAllocated, ledgerTierFor, agingDate } from "../lib/domain.js";
 
 export function KpiTile({ label, value, foot }) {
   return React.createElement("div", { className: "kpi-tile" },
@@ -71,7 +71,7 @@ export function Breadcrumb({ items }) {
 }
 export function LedgerAgingBadge({ device }) {
   if (device.status === "reallocated") return React.createElement(Pill, { cls: "pill-muted" }, "Reallocated");
-  const days = daysAllocated(device.allocatedDate);
+  const days = daysAllocated(agingDate(device));
   const tier = ledgerTierFor(days);
   if (!tier) return React.createElement("span", { style: { color: "var(--text-faint)" } }, "—");
   return React.createElement(Pill, { cls: tier.cls }, tier.label, days !== null ? " · " + days + "d" : "");

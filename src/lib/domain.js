@@ -106,7 +106,14 @@ export function ledgerTierFor(days) {
   }
   return null;
 }
-// devices: array of {status, allocatedDate}
+// A device's age is measured from when it FIRST entered the channel (Initial Allocation
+// Date), not from its current DSR assignment -- reallocating a device to a new DSR does not
+// reset the clock on how long it's been sitting unsold. Falls back to allocatedDate for
+// records that predate this distinction (e.g. a manual paste with only one date column).
+export function agingDate(dv) {
+  return dv.initialAllocatedDate || dv.allocatedDate;
+}
+// devices: array of {status, allocatedDate, initialAllocatedDate}
 export function countsForDevices(devices) {
   const counts = { total: 0, fresh: 0, projected: 0, aged: 0, urgent: 0, highrisk: 0, reallocated: 0, returned: 0 };
   devices.forEach((dv) => {
@@ -116,7 +123,7 @@ export function countsForDevices(devices) {
       return;
     }
     if (dv.status === "returned") counts.returned++;
-    const tier = ledgerTierFor(daysAllocated(dv.allocatedDate));
+    const tier = ledgerTierFor(daysAllocated(agingDate(dv)));
     if (tier) counts[tier.key]++;
   });
   return counts;
@@ -143,7 +150,7 @@ export function groupDevicesByTier(devices) {
   LEDGER_TIERS.forEach((t) => { groups[t.key] = []; });
   devices.forEach((dv) => {
     if (dv.status === "reallocated" || dv.status === "returned") return;
-    const tier = ledgerTierFor(daysAllocated(dv.allocatedDate));
+    const tier = ledgerTierFor(daysAllocated(agingDate(dv)));
     if (tier) groups[tier.key].push(dv);
   });
   return groups;
@@ -166,7 +173,8 @@ const DEVICE_COLUMN_ALIASES = {
   model: ["product", "model", "itemtypecode", "item type code", "item type", "sku"],
   shopName: ["shopname", "shop name", "shop", "depot", "outlet", "outletname"],
   dsrName: ["dsrname", "dsr name", "dsr", "agent"],
-  allocatedDate: ["current_allocation_date", "current allocation date", "allocated date", "allocation date", "initial_allocation_date", "initial allocation date"],
+  allocatedDate: ["current_allocation_date", "current allocation date", "allocated date", "allocation date"],
+  initialAllocatedDate: ["initial_allocation_date", "initial allocation date"],
   deviceAge: ["deviceage", "device age", "age"],
 };
 function normalizeHeaderCell(s) {
@@ -213,7 +221,11 @@ export function parseDeviceRow(cells, uploadDate, columnMap) {
     allocDate.setDate(allocDate.getDate() - deviceAge);
     allocatedDate = allocDate.getFullYear() + "-" + String(allocDate.getMonth() + 1).padStart(2, "0") + "-" + String(allocDate.getDate()).padStart(2, "0");
   }
-  return { serial, model, shopName, dsrName, allocatedDate, status: "in_stock" };
+  // initialAllocatedDate drives aging (see agingDate()) -- it does not reset on reallocation
+  // the way allocatedDate (current DSR assignment) does. A sheet without a separate Initial
+  // Allocation Date column has nothing better to age from, so it falls back to allocatedDate.
+  const initialAllocatedDate = (map.initialAllocatedDate !== undefined ? parseFlexibleDate(cells[map.initialAllocatedDate]) : null) || allocatedDate;
+  return { serial, model, shopName, dsrName, allocatedDate, initialAllocatedDate, status: "in_stock" };
 }
 // Shared by the single-depot and all-depots paste modals: splits the pasted text into
 // (columnMap, dataLines) once, so both callers get the same header-sniffing behavior.

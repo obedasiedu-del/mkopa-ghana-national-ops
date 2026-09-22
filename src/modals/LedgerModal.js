@@ -3,7 +3,7 @@ import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { Modal, LedgerAgingBadge } from "../components/ui.js";
 import { depotsForScope, ledgerDevices, PSEUDO_DEPOTS } from "../lib/selectors.js";
-import { countsForDevices, parsePastedDevices, daysAllocated, ledgerTierFor, fmtDateShort, downloadCsv } from "../lib/domain.js";
+import { countsForDevices, parsePastedDevices, daysAllocated, agingDate, ledgerTierFor, fmtDateShort, downloadCsv } from "../lib/domain.js";
 
 const LEDGER_MODAL_CHIP_DEFS = [
   { key: "all", label: "All" }, { key: "fresh", label: "Fresh" }, { key: "projected", label: "Projected" },
@@ -42,19 +42,19 @@ export function LedgerModal({ depotCode: initialCode }) {
   }
   const q = search.trim().toLowerCase();
   const rows = [...devices]
-    .sort((a, b) => (daysAllocated(b.allocatedDate) || 0) - (daysAllocated(a.allocatedDate) || 0))
+    .sort((a, b) => (daysAllocated(agingDate(b)) || 0) - (daysAllocated(agingDate(a)) || 0))
     .filter((dv) => {
-      const tier = dv.status === "reallocated" ? null : ledgerTierFor(daysAllocated(dv.allocatedDate));
+      const tier = dv.status === "reallocated" ? null : ledgerTierFor(daysAllocated(agingDate(dv)));
       if (!matchesFilter(dv, tier)) return false;
       if (q && !(dv.serial || "").toLowerCase().includes(q) && !(dv.dsrName || "").toLowerCase().includes(q)) return false;
       return true;
     });
   function exportDepotCsv() {
-    const out = [["Serial Number", "Product", "Shop Name", "DSR Name", "Date Allocated", "Days", "Aging Tier", "Status"]];
+    const out = [["Serial Number", "Product", "Shop Name", "DSR Name", "In Channel Since", "Days", "Aging Tier", "Status"]];
     devices.forEach((dv) => {
-      const days = daysAllocated(dv.allocatedDate);
+      const days = daysAllocated(agingDate(dv));
       const tier = dv.status === "reallocated" ? null : ledgerTierFor(days);
-      out.push([dv.serial, dv.model, dv.shopName || "", dv.dsrName, dv.allocatedDate, days === null ? "" : days, tier ? tier.label : (dv.status === "reallocated" ? "" : "—"), dv.status]);
+      out.push([dv.serial, dv.model, dv.shopName || "", dv.dsrName, agingDate(dv), days === null ? "" : days, tier ? tier.label : (dv.status === "reallocated" ? "" : "—"), dv.status]);
     });
     downloadCsv(depotCode + "-device-allocation-analysis.csv", out);
   }

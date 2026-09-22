@@ -82,7 +82,7 @@ export function useAppData() {
       if (!map[r.depot_code]) map[r.depot_code] = [];
       map[r.depot_code].push({
         serial: r.serial, model: r.model || "", shopName: r.shop_name || "", dsrName: r.dsr_name || "",
-        allocatedDate: r.allocated_date, status: r.status,
+        allocatedDate: r.allocated_date, initialAllocatedDate: r.initial_allocated_date || r.allocated_date, status: r.status,
         statusUpdatedAt: r.status_updated_at, statusUpdatedBy: r.status_updated_by || "",
       });
     });
@@ -152,7 +152,7 @@ export function useAppData() {
     if (devicesArr.length) {
       const rows = devicesArr.map((d) => ({
         depot_code: depotCode, serial: d.serial, model: d.model, shop_name: d.shopName,
-        dsr_name: d.dsrName, allocated_date: d.allocatedDate, status: d.status || "in_stock",
+        dsr_name: d.dsrName, allocated_date: d.allocatedDate, initial_allocated_date: d.initialAllocatedDate || d.allocatedDate, status: d.status || "in_stock",
       }));
       for (const batch of chunkArr(rows, 500)) {
         const { error } = await supabaseClient.from("device_ledger").insert(batch);

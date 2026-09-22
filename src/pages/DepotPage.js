@@ -8,7 +8,7 @@ import { ledgerDevices, depotStockTotals } from "../lib/selectors.js";
 import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
   SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
-  fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, ledgerTierFor, countsForDevices,
+  fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices,
   groupDevicesByTier, downloadCsv,
 } from "../lib/domain.js";
 
@@ -241,8 +241,8 @@ const AGING_COLUMNS = [
   { key: "serial", label: "Serial", sortable: true, render: (dv) => React.createElement("span", { className: "mono" }, dv.serial) },
   { key: "model", label: "Product", sortable: true, render: (dv) => dv.model || "—" },
   { key: "dsrName", label: "DSR", sortable: true, render: (dv) => dv.dsrName || "—" },
-  { key: "allocatedDate", label: "Allocated", sortable: true, render: (dv) => fmtDateShort(dv.allocatedDate) },
-  { key: "days", label: "Days", numeric: true, sortable: true, sortValue: (dv) => daysAllocated(dv.allocatedDate), render: (dv) => daysAllocated(dv.allocatedDate) },
+  { key: "allocatedDate", label: "In Channel Since", sortable: true, sortValue: (dv) => agingDate(dv), render: (dv) => fmtDateShort(agingDate(dv)) },
+  { key: "days", label: "Days", numeric: true, sortable: true, sortValue: (dv) => daysAllocated(agingDate(dv)), render: (dv) => daysAllocated(agingDate(dv)) },
 ];
 
 /* ============ Audit History ============ */

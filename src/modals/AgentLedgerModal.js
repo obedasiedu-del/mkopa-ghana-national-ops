@@ -3,14 +3,14 @@ import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { Modal, LedgerAgingBadge } from "../components/ui.js";
 import { ledgerDevicesForScope } from "../lib/selectors.js";
-import { daysAllocated } from "../lib/domain.js";
+import { daysAllocated, agingDate } from "../lib/domain.js";
 
 export function AgentLedgerModal({ group, scope = "national" }) {
   const { data, closeModal, runAction } = useApp();
   const [setBy, setSetBy] = React.useState("");
   const devices = ledgerDevicesForScope(data.deviceLedger, data.depots, scope)
     .filter((dv) => ((dv.dsrName || "").trim() || "(No DSR listed)") === group.name)
-    .sort((a, b) => (daysAllocated(b.allocatedDate) || 0) - (daysAllocated(a.allocatedDate) || 0));
+    .sort((a, b) => (daysAllocated(agingDate(b)) || 0) - (daysAllocated(agingDate(a)) || 0));
   return React.createElement(Modal, { open: true, onClose: closeModal, wide: true, title: group.name, footer: React.createElement("button", { className: "btn", onClick: closeModal }, "Close") },
     React.createElement("div", { className: "field-row" },
       React.createElement("div", { className: "field-label" }, "Set by (your name)"),
