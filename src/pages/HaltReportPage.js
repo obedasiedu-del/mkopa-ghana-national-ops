@@ -16,7 +16,10 @@ export function HaltReportPage() {
   const halted = rows.filter((r) => r.halted);
 
   const columns = React.useMemo(() => [
-    { key: "depot", label: "Depot", sortable: true, sortValue: (r) => r.depot.name, render: (r) => r.depot.name },
+    {
+      key: "depot", label: "Depot", sortable: true, sortValue: (r) => r.depot.name,
+      render: (r) => r.depot.status === "closed" ? [r.depot.name, " ", React.createElement(Pill, { key: "closed", cls: "pill-muted" }, "Closed")] : r.depot.name,
+    },
     { key: "region", label: "Region", sortable: true, sortValue: (r) => r.depot.region, render: (r) => r.depot.region },
     { key: "allocated", label: "Devices with DSRs", numeric: true, sortable: true, render: (r) => fmtNum(r.allocated) },
     { key: "agedCount", label: "Aged (14d+)", numeric: true, sortable: true, render: (r) => fmtNum(r.agedCount) },

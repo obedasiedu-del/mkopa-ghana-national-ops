@@ -97,13 +97,15 @@ export function bucketMovementsByDay(rows, days) {
   return out;
 }
 
-// Halt-of-allocation status for every active depot in scope, against the currently
-// active phase of the agreed aged-stock policy (see lib/haltPolicy.js). Returns [] before
-// the policy's first phase has started.
+// Halt-of-allocation status for every depot in scope (active AND closed -- a closed depot
+// can still be sitting on aged stock that needs recovering, so it stays visible here even
+// though it's excluded from active-depot KPIs elsewhere), against the currently active phase
+// of the agreed aged-stock policy (see lib/haltPolicy.js). Returns [] before the policy's
+// first phase has started.
 export function haltStatusesForScope(data, scope) {
   const phase = activeHaltPhase();
   if (!phase) return [];
-  return activeDepots(depotsForScope(data.depots, scope)).map((d) => {
+  return depotsForScope(data.depots, scope).map((d) => {
     const counts = countsForDevices(ledgerDevices(data.deviceLedger, d.code));
     return { depot: d, ...haltStatusForDepot(counts, phase) };
   });
