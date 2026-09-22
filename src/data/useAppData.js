@@ -262,6 +262,31 @@ export function useAppData() {
     await refreshStockBalances();
     return rows.length;
   }, [refreshStockBalances]);
+  // Used by the "Upload Stock Movements" bulk paste -- rows already have movementType/
+  // depotCode/toDepotCode resolved by parseMovementPaste. Inserted in chunks of 300 so a
+  // row that would violate the stock-balance trigger only fails its own chunk, and the
+  // error says how many rows landed before it, rather than losing the whole paste to one
+  // bad row deep in a 3,000-row file.
+  const recordMovementsBulk = React.useCallback(async (rows, defaultRecordedBy) => {
+    if (!rows.length) throw new Error("No valid movement rows to save — check the pasted data.");
+    const chunks = chunkArr(rows, 300);
+    for (let i = 0; i < chunks.length; i++) {
+      const batch = chunks[i].map((r) => ({
+        depot_code: r.depotCode, to_depot_code: r.toDepotCode || null,
+        serial: r.serial || null, model: r.model, quantity: r.quantity,
+        movement_type: r.movementType, reference: r.reference || null,
+        moved_at: r.movedAt || new Date().toISOString(),
+        recorded_by: r.recordedBy || defaultRecordedBy || null,
+      }));
+      const { error } = await supabaseClient.from("stock_movements").insert(batch);
+      if (error) {
+        const done = i * 300;
+        throw new Error(`Saved ${done} of ${rows.length} rows, then stopped at row ${done + 1}: ${error.message}`);
+      }
+    }
+    await refreshStockBalances();
+    return rows.length;
+  }, [refreshStockBalances]);
   // Lightweight counts for the National/Region "Stock Movement" KPI -- a head-only count
   // query rather than pulling rows, so this stays cheap regardless of history size.
   const fetchMovementCount = React.useCallback(async ({ depotCodes, sinceIso } = {}) => {
@@ -294,6 +319,6 @@ export function useAppData() {
     loaded, dbError, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
     saveLedgerBaseline, saveLedgerBaselineBulk, clearAllDeviceLedger, updateDeviceStatus,
-    fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, fetchAuditLog,
+    fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
   };
 }

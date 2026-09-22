@@ -57,7 +57,9 @@ export function MovementsPage() {
       React.createElement("div", null,
         React.createElement("div", { className: "scope-title" }, "Stock Movement", region ? " — " + region : " — National"),
         React.createElement("div", { className: "scope-sub" }, "Transfers, receipts, issues, returns and status changes")),
-      canRecord && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => openModal("recordMovement", { depotCode: depotCode || (scopedDepots[0] || {}).code, onSaved: load }) }, "+ Record Movement")),
+      canRecord && React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+        React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkMovement", { onSaved: load }) }, "Upload Movements"),
+        React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => openModal("recordMovement", { depotCode: depotCode || (scopedDepots[0] || {}).code, onSaved: load }) }, "+ Record Movement"))),
     React.createElement(FilterBar, {
       regionOptions: REGION_ORDER, region, onRegionChange: (r) => { setRegion(r); setDepotCode(null); },
       depotOptions: scopedDepots, depotCode, onDepotChange: setDepotCode,

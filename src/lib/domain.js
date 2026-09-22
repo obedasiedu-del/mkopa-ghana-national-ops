@@ -150,8 +150,11 @@ export function groupDevicesByTier(devices) {
 }
 
 /* ---------------- Bulk paste parsing / depot fuzzy matching ---------------- */
+// Trims only blank lines, not each line's own content -- a whole-line trim would eat a
+// leading tab-delimited empty cell (e.g. a movement row with no "From"), shifting every
+// column after it. Individual cells are trimmed after splitting, once delimiters are known.
 export function splitPasteLines(text) {
-  return String(text || "").split(/\r\n|\n|\r/).map((l) => l.trim()).filter((l) => l.length);
+  return String(text || "").split(/\r\n|\n|\r/).filter((l) => l.trim().length);
 }
 // Column headers vary a lot between exports (our own simple template vs. a full
 // operational "Device Register" dump with 19 columns in a different order) -- rather than
@@ -262,6 +265,17 @@ export const DEPOT_ALIASES = {
   SC74: ["kasoa 2", "kasoa two", "kasoa ofaakor", "ofaakor", "kasoa ofaakor 2", "kasoa branch 2"],
 };
 export function matchDepotForShop(shopName, depotIndex) {
+  const raw = String(shopName || "").trim();
+  if (!raw) return null;
+  // A pasted code is an exact identifier, not natural-language text -- check it against the
+  // real code first, before any normalizing/tokenizing. This matters because a code like
+  // "NC-ADEISODEPO" is stored (and compared below) as one hyphenated string, but the token
+  // match a few lines down strips punctuation into ["nc", "adeisodepo"], which can never
+  // equal the un-split "nc-adeisodepo" -- so a hyphenated code would otherwise never match
+  // itself even when pasted verbatim.
+  const rawLower = raw.toLowerCase();
+  const directCode = depotIndex.find((d) => d.codeLower === rawLower);
+  if (directCode) return directCode.code;
   const norm = normalizeDepotName(shopName);
   if (!norm) return null;
   const shopToks = norm.split(" ").filter((w) => w.length > 0);
@@ -365,6 +379,100 @@ export function parseDepotStockPaste(text, depots) {
     byDepot[code][model].returned += returned;
   });
   return { byDepot, skipped, unmatchedRows, unmatchedCounts };
+}
+
+// Bulk paste for stock movements (transfers/receipts/issues) -- e.g. a waybill/transit
+// export with a source and/or destination column per row. Column names are sniffed the
+// same way as the device paste above; From/To are matched against ALL depots including
+// the synthetic pseudo-depot buckets (Warehouse, Refurb, Reverse Logistics, Indirect,
+// Unrecognised), not just active retail depots, since transit data routinely references
+// those. Movement type is inferred from which of From/To resolved to a depot: both -> a
+// transfer, From only -> an issue, To only -> a receipt.
+const MOVEMENT_COLUMN_ALIASES = {
+  from: ["from", "source", "from depot", "source depot", "origin"],
+  to: ["to", "destination", "to depot", "destination depot"],
+  serial: ["serial", "serial number", "serialnumber", "imei"],
+  model: ["model", "product", "item", "sku", "itemtypecode", "item type code"],
+  quantity: ["quantity", "qty"],
+  reference: ["reference", "waybill", "note", "reason"],
+  date: ["date", "moved at", "movedat", "moved date", "timestamp"],
+  recordedBy: ["recorded by", "recordedby", "by", "agent"],
+};
+function detectMovementColumnMap(headerCells) {
+  const norm = headerCells.map(normalizeHeaderCell);
+  const map = {};
+  Object.keys(MOVEMENT_COLUMN_ALIASES).forEach((field) => {
+    for (const alias of MOVEMENT_COLUMN_ALIASES[field]) {
+      const idx = norm.indexOf(alias);
+      if (idx !== -1) { map[field] = idx; return; }
+    }
+  });
+  return map;
+}
+function parseMovementRow(cells, columnMap) {
+  const map = columnMap || {};
+  const g = (field, fallbackIdx) => (map[field] !== undefined ? cells[map[field]] : cells[fallbackIdx]) || "";
+  const fromText = g("from", 0);
+  const toText = g("to", 1);
+  const serial = g("serial", 2);
+  const model = g("model", 3);
+  const qtyRaw = g("quantity", 4);
+  const reference = g("reference", 5);
+  const dateRaw = g("date", 6);
+  const recordedBy = g("recordedBy", 7);
+  if (!fromText && !toText) return null;
+  if (!model) return null;
+  let quantity = qtyRaw.trim() === "" ? 1 : parseFloat(qtyRaw);
+  if (!Number.isFinite(quantity) || quantity <= 0) return null;
+  return { fromText, toText, serial, model, quantity, reference, movedAt: parseFlexibleDate(dateRaw), recordedBy };
+}
+export function parseMovementPaste(text, depots) {
+  const lines = splitPasteLines(text);
+  const rows = [];
+  const unmatchedRows = [];
+  const unmatchedCounts = {};
+  const typeCounts = { transfer: 0, issue: 0, receipt: 0 };
+  let skipped = 0;
+  if (!lines.length) return { rows, skipped, unmatchedRows, unmatchedCounts, typeCounts };
+  const headerCells = (lines[0].indexOf("\t") !== -1 ? lines[0].split("\t") : lines[0].split(",")).map((c) => c.trim());
+  const columnMap = detectMovementColumnMap(headerCells);
+  const isHeader = Object.keys(columnMap).length >= 2 && (columnMap.from !== undefined || columnMap.to !== undefined);
+  const dataLines = isHeader ? lines.slice(1) : lines;
+  const depotIndex = buildDepotIndex(depots);
+  const matchCache = {};
+  function matchCached(depotText) {
+    if (!depotText) return null;
+    const key = normalizeDepotName(depotText);
+    if (!(key in matchCache)) matchCache[key] = matchDepotForShop(depotText, depotIndex);
+    return matchCache[key];
+  }
+  dataLines.forEach((line) => {
+    let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
+    cells = cells.map((c) => c.trim());
+    const parsed = parseMovementRow(cells, isHeader ? columnMap : null);
+    if (!parsed) { skipped++; return; }
+    const fromCode = matchCached(parsed.fromText);
+    const toCode = matchCached(parsed.toText);
+    if (parsed.fromText && !fromCode) {
+      unmatchedCounts[parsed.fromText] = (unmatchedCounts[parsed.fromText] || 0) + 1;
+      unmatchedRows.push({ ...parsed, reason: "From not matched to a depot" });
+      return;
+    }
+    if (parsed.toText && !toCode) {
+      unmatchedCounts[parsed.toText] = (unmatchedCounts[parsed.toText] || 0) + 1;
+      unmatchedRows.push({ ...parsed, reason: "To not matched to a depot" });
+      return;
+    }
+    const movementType = fromCode && toCode ? "transfer" : fromCode ? "issue" : "receipt";
+    typeCounts[movementType]++;
+    rows.push({
+      depotCode: fromCode || toCode, toDepotCode: movementType === "transfer" ? toCode : null,
+      serial: parsed.serial || null, model: parsed.model, quantity: parsed.quantity,
+      movementType, reference: parsed.reference || null, movedAt: parsed.movedAt || null,
+      recordedBy: parsed.recordedBy || null,
+    });
+  });
+  return { rows, skipped, unmatchedRows, unmatchedCounts, typeCounts };
 }
 
 /* ---------------- CSV export ---------------- */
