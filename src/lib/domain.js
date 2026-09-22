@@ -146,29 +146,87 @@ export function groupDevicesByTier(devices) {
 export function splitPasteLines(text) {
   return String(text || "").split(/\r\n|\n|\r/).map((l) => l.trim()).filter((l) => l.length);
 }
-export function parseDeviceRow(cells, uploadDate) {
-  const serial = cells[0] || "";
+// Column headers vary a lot between exports (our own simple template vs. a full
+// operational "Device Register" dump with 19 columns in a different order) -- rather than
+// force everyone to reorder columns before pasting, the first row is sniffed for recognised
+// header names and mapped by name; only if that fails do we fall back to the original fixed
+// 5-column order (Serial, Product, Shop Name, DSR Name, Device Age).
+const DEVICE_COLUMN_ALIASES = {
+  serial: ["serialnumber", "serial number", "serial"],
+  model: ["product", "model", "itemtypecode", "item type code", "item type", "sku"],
+  shopName: ["shopname", "shop name", "shop", "depot", "outlet", "outletname"],
+  dsrName: ["dsrname", "dsr name", "dsr", "agent"],
+  allocatedDate: ["current_allocation_date", "current allocation date", "allocated date", "allocation date", "initial_allocation_date", "initial allocation date"],
+  deviceAge: ["deviceage", "device age", "age"],
+};
+function normalizeHeaderCell(s) {
+  return String(s || "").trim().toLowerCase().replace(/[_\s]+/g, " ");
+}
+function detectDeviceColumnMap(headerCells) {
+  const norm = headerCells.map(normalizeHeaderCell);
+  const map = {};
+  Object.keys(DEVICE_COLUMN_ALIASES).forEach((field) => {
+    for (const alias of DEVICE_COLUMN_ALIASES[field]) {
+      const idx = norm.indexOf(alias);
+      if (idx !== -1) { map[field] = idx; return; }
+    }
+  });
+  return map;
+}
+// Accepts "2026-09-19" (incl. datetime), "9/19/2026", or a raw Excel serial date number --
+// the shapes a cell can paste as depending on its source formatting.
+function parseFlexibleDate(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[1] + "-" + m[2] + "-" + m[3];
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return m[3] + "-" + m[1].padStart(2, "0") + "-" + m[2].padStart(2, "0");
+  if (/^\d{4,6}$/.test(s)) {
+    const d = new Date((Number(s) - 25569) * 86400000);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  return null;
+}
+export function parseDeviceRow(cells, uploadDate, columnMap) {
+  const map = columnMap || {};
+  const serial = (map.serial !== undefined ? cells[map.serial] : cells[0]) || "";
   if (!serial) return null;
-  const model = cells[1] || "";
-  const shopName = cells[2] || "";
-  const dsrName = cells[3] || "";
-  let deviceAge = parseInt(cells[4] || "", 10);
-  if (Number.isNaN(deviceAge) || deviceAge < 0) deviceAge = 0;
-  const allocDate = new Date(uploadDate + "T00:00:00");
-  allocDate.setDate(allocDate.getDate() - deviceAge);
-  const allocatedDate = allocDate.getFullYear() + "-" + String(allocDate.getMonth() + 1).padStart(2, "0") + "-" + String(allocDate.getDate()).padStart(2, "0");
+  const model = (map.model !== undefined ? cells[map.model] : cells[1]) || "";
+  const shopName = (map.shopName !== undefined ? cells[map.shopName] : cells[2]) || "";
+  const dsrName = (map.dsrName !== undefined ? cells[map.dsrName] : cells[3]) || "";
+  let allocatedDate = map.allocatedDate !== undefined ? parseFlexibleDate(cells[map.allocatedDate]) : null;
+  if (!allocatedDate) {
+    let deviceAge = parseInt((map.deviceAge !== undefined ? cells[map.deviceAge] : cells[4]) || "", 10);
+    if (Number.isNaN(deviceAge) || deviceAge < 0) deviceAge = 0;
+    const allocDate = new Date(uploadDate + "T00:00:00");
+    allocDate.setDate(allocDate.getDate() - deviceAge);
+    allocatedDate = allocDate.getFullYear() + "-" + String(allocDate.getMonth() + 1).padStart(2, "0") + "-" + String(allocDate.getDate()).padStart(2, "0");
+  }
   return { serial, model, shopName, dsrName, allocatedDate, status: "in_stock" };
 }
-export function parsePastedDevices(text) {
+// Shared by the single-depot and all-depots paste modals: splits the pasted text into
+// (columnMap, dataLines) once, so both callers get the same header-sniffing behavior.
+function prepareDevicePaste(text) {
   const lines = splitPasteLines(text);
+  if (lines.length === 0) return { columnMap: null, dataLines: [] };
+  const headerCells = (lines[0].indexOf("\t") !== -1 ? lines[0].split("\t") : lines[0].split(",")).map((c) => c.trim());
+  const columnMap = detectDeviceColumnMap(headerCells);
+  // Require at least serial + one more recognised field before trusting it's a real header
+  // row rather than a data row that happens to start with "Serial...".
+  const isHeader = columnMap.serial !== undefined && Object.keys(columnMap).length >= 2;
+  return { columnMap: isHeader ? columnMap : null, dataLines: isHeader ? lines.slice(1) : lines };
+}
+export function parsePastedDevices(text) {
+  const { columnMap, dataLines } = prepareDevicePaste(text);
   const rows = [];
   let skipped = 0;
   const uploadDate = todayStr();
-  lines.forEach((line, idx) => {
+  dataLines.forEach((line, idx) => {
     let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
     cells = cells.map((c) => c.trim());
-    if (idx === 0 && /serial/i.test(cells[0] || "")) return;
-    const row = parseDeviceRow(cells, uploadDate);
+    if (!columnMap && idx === 0 && /serial/i.test(cells[0] || "")) return;
+    const row = parseDeviceRow(cells, uploadDate, columnMap);
     if (!row) { skipped++; return; }
     rows.push(row);
   });
@@ -232,7 +290,7 @@ export function classifyShopForLedger(shopName, depotIndex) {
 }
 // Splits one big multi-depot paste into per-depot device lists.
 export function parsePastedDevicesMultiDepot(text, depots) {
-  const lines = splitPasteLines(text);
+  const { columnMap, dataLines } = prepareDevicePaste(text);
   const uploadDate = todayStr();
   const byDepot = {};
   let skipped = 0;
@@ -244,11 +302,11 @@ export function parsePastedDevicesMultiDepot(text, depots) {
     if (!(key in classifyCache)) classifyCache[key] = classifyShopForLedger(shopName, depotIndex);
     return classifyCache[key];
   }
-  lines.forEach((line, idx) => {
+  dataLines.forEach((line, idx) => {
     let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
     cells = cells.map((c) => c.trim());
-    if (idx === 0 && /serial/i.test(cells[0] || "")) return;
-    const row = parseDeviceRow(cells, uploadDate);
+    if (!columnMap && idx === 0 && /serial/i.test(cells[0] || "")) return;
+    const row = parseDeviceRow(cells, uploadDate, columnMap);
     if (!row) { skipped++; return; }
     const cls = classifyCached(row.shopName);
     if (!byDepot[cls.code]) byDepot[cls.code] = [];

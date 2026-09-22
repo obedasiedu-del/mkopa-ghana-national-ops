@@ -74,7 +74,7 @@ export function LedgerModal({ depotCode: initialCode }) {
       React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--text-muted)" } }, row[0]),
       React.createElement("div", { className: "mono", style: { fontSize: 15, fontWeight: 600, color: row[2] } }, row[1])))),
     React.createElement("div", { className: "drawer-section-title", style: { marginTop: 4 } }, "Upload Baseline"),
-    React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 6 } }, "Paste from Excel — one device per row, columns in this order: Serial Number, Product, Shop Name, DSR Name, Device Age (days). Every device starts \"In Stock\" — mark one Reallocated from the table below once it's recovered. Uploading a new baseline replaces this depot's current device list."),
+    React.createElement("div", { style: { fontSize: 11, color: "var(--text-faint)", marginBottom: 6 } }, "Paste from Excel, header row included — columns (Serial Number, Product, Shop Name, DSR Name, Allocation Date or Device Age) are matched by name in whatever order your sheet uses. No header falls back to a fixed order: Serial Number, Product, Shop Name, DSR Name, Device Age (days). Every device starts \"In Stock\" — mark one Reallocated from the table below once it's recovered. Uploading a new baseline replaces this depot's current device list."),
     React.createElement("div", { className: "field-row" },
       React.createElement("textarea", { className: "field-input", rows: 5, placeholder: "SN12345\tA07/64\tKasoa Main Shop\tKwame Mensah\t12", value: pasteText, onChange: (e) => setPasteText(e.target.value) })),
     React.createElement("div", { className: "field-row" },
