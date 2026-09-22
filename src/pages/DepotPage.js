@@ -2,9 +2,10 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { canWriteDepot } from "../data/useAuth.js";
-import { KpiTile, Pill, ScStatusPill, ScoreCell, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, LedgerAgingBadge } from "../components/ui.js";
+import { KpiTile, Pill, ScStatusPill, ScoreCell, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, LedgerAgingBadge, HaltBanner } from "../components/ui.js";
 import { DataTable } from "../components/DataTable.js";
 import { ledgerDevices, depotStockTotals } from "../lib/selectors.js";
+import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
   SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
   fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, ledgerTierFor, countsForDevices,
@@ -31,6 +32,8 @@ export function DepotPage() {
   if (!rec) return React.createElement("div", { className: "content" }, "Loading…");
 
   const canWrite = canWriteDepot(auth.role, rec.code, rec.region);
+  const haltPhase = activeHaltPhase();
+  const haltStatus = haltPhase ? haltStatusForDepot(countsForDevices(ledgerDevices(data.deviceLedger, rec.code)), haltPhase) : null;
 
   return React.createElement("div", { className: "content" },
     React.createElement(Breadcrumb, {
@@ -45,6 +48,7 @@ export function DepotPage() {
         React.createElement("div", { className: "scope-title" }, rec.name),
         React.createElement("div", { className: "scope-sub" }, rec.code, " · ", rec.region, rec.status === "closed" ? " · Closed" : "")),
       React.createElement(ScStatusPill, { status: rec.scStatus })),
+    React.createElement(HaltBanner, { status: haltStatus }),
     React.createElement(Tabs, { tabs: DEPOT_TABS, active: tab, onChange: (id) => window.location.hash = "#/depot/" + encodeURIComponent(rec.code) + "/" + id }),
     React.createElement("div", { style: { marginTop: 16 } },
       tab === "devices" && React.createElement(DevicesTab, { rec, canWrite }),

@@ -6,7 +6,7 @@ import { KpiTile, EmptyRow } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { REGION_ORDER, fmtNum, groupDevicesByAgent, countsForDevices } from "../lib/domain.js";
-import { overviewStats, ledgerDevicesForScope, bucketMovementsByDay } from "../lib/selectors.js";
+import { overviewStats, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
 function RegionCard({ region }) {
@@ -43,7 +43,7 @@ function AgentsByDsrTable() {
 }
 
 export function NationalOverviewPage() {
-  const { data, auth, openModal, goMovements, goAudit } = useApp();
+  const { data, auth, openModal, goMovements, goAudit, goHalts } = useApp();
   const [view, setView] = React.useState("map");
   const stats = overviewStats(data, "national");
   const c = stats.ledgerCounts;
@@ -51,6 +51,10 @@ export function NationalOverviewPage() {
   const agedPct = c.total ? Math.round((agedTotal / c.total) * 1000) / 10 : null;
   const totalStock = stats.deviceTotal + c.total;
   const canBulkEdit = isAdmin(auth.role);
+
+  const haltStatuses = React.useMemo(() => haltStatusesForScope(data, "national"), [data]);
+  const haltedDepots = haltStatuses.filter((s) => s.halted);
+  const haltPhase = haltStatuses[0]?.phase || null;
 
   const [movements7d, setMovements7d] = React.useState(null);
   React.useEffect(() => {
@@ -70,6 +74,12 @@ export function NationalOverviewPage() {
       React.createElement("div", null,
         React.createElement("div", { className: "scope-title" }, "National Overview"),
         React.createElement("div", { className: "scope-sub" }, REGION_ORDER.length, " regions · ", stats.activeDepots, " active depots"))),
+    haltedDepots.length > 0 && React.createElement("div", { className: "banner banner-critical" },
+      React.createElement("span", null, "⛔"),
+      React.createElement("div", null,
+        React.createElement("strong", null, haltedDepots.length, " depot", haltedDepots.length === 1 ? "" : "s", " on allocation halt"),
+        " under ", haltPhase.label, " — aged stock (14d+) at or above the phase limit. ",
+        React.createElement("button", { className: "btn btn-sm", style: { marginLeft: 6 }, onClick: () => goHalts() }, "View Halt Status Report →"))),
     React.createElement("div", { className: "kpi-grid" },
       React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),
       React.createElement(KpiTile, { label: "Devices at Depots", value: fmtNum(stats.deviceTotal), foot: "current balance, all regions" }),
@@ -79,10 +89,12 @@ export function NationalOverviewPage() {
       React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiTile, { label: "Active Depots", value: fmtNum(stats.activeDepots), foot: (stats.totalDepots - stats.activeDepots) + " closed" }),
       React.createElement(KpiTile, { label: "SC Coverage", value: stats.scFilled + "/" + stats.activeDepots, foot: stats.scVacant + " vacant" }),
-      React.createElement(KpiTile, { label: "High Risk (30d+)", value: fmtNum(c.highrisk), foot: "escalate now" })),
+      React.createElement(KpiTile, { label: "High Risk (30d+)", value: fmtNum(c.highrisk), foot: "escalate now" }),
+      React.createElement(KpiTile, { label: "Allocation Halts", value: fmtNum(haltedDepots.length), foot: haltPhase ? haltPhase.label + " active" : "policy not started" })),
     React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 22 } },
       React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements() }, "View Stock Movement Log →"),
-      React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit() }, "View Audit History →")),
+      React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit() }, "View Audit History →"),
+      React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts() }, "View Halt Status Report →")),
     React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
       React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Aging Distribution"),

@@ -1,5 +1,6 @@
 "use strict";
 import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, submissionTotals, todayStr } from "./domain.js";
+import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
 
@@ -94,6 +95,18 @@ export function bucketMovementsByDay(rows, days) {
     out.push({ date: key, count: counts[key] || 0 });
   }
   return out;
+}
+
+// Halt-of-allocation status for every active depot in scope, against the currently
+// active phase of the agreed aged-stock policy (see lib/haltPolicy.js). Returns [] before
+// the policy's first phase has started.
+export function haltStatusesForScope(data, scope) {
+  const phase = activeHaltPhase();
+  if (!phase) return [];
+  return activeDepots(depotsForScope(data.depots, scope)).map((d) => {
+    const counts = countsForDevices(ledgerDevices(data.deviceLedger, d.code));
+    return { depot: d, ...haltStatusForDepot(counts, phase) };
+  });
 }
 
 export function auditForScope(auditLog, depots, scope) {

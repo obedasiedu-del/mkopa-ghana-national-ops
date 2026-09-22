@@ -12,6 +12,7 @@ import React from "react";
 //   #/depot/:code/:tab              depot page, one of: devices | submission | movement | aging | audit
 //   #/movements?region=X            Stock Movement log, national (no region) or one region, filterable
 //   #/audit?region=X                Audit History log, national (no region) or one region, filterable
+//   #/halts?region=X                Allocation Halt Status report, national (no region) or one region
 //   #/search?q=...                  cross-entity search results
 //   #/admin                         user role management (national_admin only)
 
@@ -31,6 +32,9 @@ function parseHash(hash) {
   }
   if (parts[0] === "audit") {
     return { name: "audit", region: query.region || null, query };
+  }
+  if (parts[0] === "halts") {
+    return { name: "halts", region: query.region || null, query };
   }
   if (parts[0] === "search") {
     return { name: "search", query };
@@ -57,6 +61,7 @@ export function useRouter() {
   const goAdmin = React.useCallback(() => navigate("#/admin"), [navigate]);
   const goMovements = React.useCallback((region) => navigate("#/movements" + (region ? "?region=" + encodeURIComponent(region) : "")), [navigate]);
   const goAudit = React.useCallback((region) => navigate("#/audit" + (region ? "?region=" + encodeURIComponent(region) : "")), [navigate]);
+  const goHalts = React.useCallback((region) => navigate("#/halts" + (region ? "?region=" + encodeURIComponent(region) : "")), [navigate]);
 
-  return { route, navigate, goNational, goRegion, goDepot, goSearch, goAdmin, goMovements, goAudit };
+  return { route, navigate, goNational, goRegion, goDepot, goSearch, goAdmin, goMovements, goAudit, goHalts };
 }

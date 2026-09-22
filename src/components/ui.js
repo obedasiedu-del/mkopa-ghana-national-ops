@@ -76,6 +76,17 @@ export function LedgerAgingBadge({ device }) {
   if (!tier) return React.createElement("span", { style: { color: "var(--text-faint)" } }, "—");
   return React.createElement(Pill, { cls: tier.cls }, tier.label, days !== null ? " · " + days + "d" : "");
 }
+// Red "Allocation Halted" banner for a single depot that has breached its phase's aged-
+// stock limit. `status` is what haltStatusForDepot()/haltStatusesForScope() returns.
+export function HaltBanner({ status }) {
+  if (!status || !status.halted) return null;
+  return React.createElement("div", { className: "banner banner-critical" },
+    React.createElement("span", null, "⛔"),
+    React.createElement("div", null,
+      React.createElement("strong", null, "Allocation halted — "), status.phase.label, ": ",
+      status.agedCount, " aged devices (14d+) has reached the ", status.limit, "-device limit for depots with ",
+      status.allocated <= 70 ? "0–70" : "71+", " devices with DSRs. Halt new allocation to this territory until aged stock clears."));
+}
 // Compact inline Region / Depot / Model / Date filter row, reused by the Stock Movement
 // and Audit History log pages. Any of the four is optional -- pass only what a given page
 // needs (e.g. Audit History has no model filter).

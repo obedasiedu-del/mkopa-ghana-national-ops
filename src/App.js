@@ -9,6 +9,7 @@ import { RegionPage } from "./pages/RegionPage.js";
 import { DepotPage } from "./pages/DepotPage.js";
 import { MovementsPage } from "./pages/MovementsPage.js";
 import { AuditPage } from "./pages/AuditPage.js";
+import { HaltReportPage } from "./pages/HaltReportPage.js";
 import { SearchPage } from "./pages/SearchPage.js";
 import { ModalHost } from "./modals/ModalHost.js";
 import { ToastStack } from "./components/ui.js";
@@ -19,6 +20,7 @@ function Router() {
   if (route.name === "depot") return React.createElement(DepotPage, null);
   if (route.name === "movements") return React.createElement(MovementsPage, null);
   if (route.name === "audit") return React.createElement(AuditPage, null);
+  if (route.name === "halts") return React.createElement(HaltReportPage, null);
   if (route.name === "search") return React.createElement(SearchPage, null);
   return React.createElement(NationalOverviewPage, null);
 }
