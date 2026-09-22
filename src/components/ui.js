@@ -84,7 +84,7 @@ export function HaltBanner({ status }) {
     React.createElement("span", null, "⛔"),
     React.createElement("div", null,
       React.createElement("strong", null, "Allocation halted — "), status.phase.label, ": ",
-      status.agedCount, " aged devices (14d+) has reached the ", status.limit, "-device limit for depots with ",
+      status.agedCount, " aged devices (14d+) has exceeded the ", status.limit, "-device limit for depots with ",
       status.allocated <= 70 ? "0–70" : "71+", " devices with DSRs. Halt new allocation to this territory until aged stock clears."));
 }
 // Compact inline Region / Depot / Model / Date filter row, reused by the Stock Movement

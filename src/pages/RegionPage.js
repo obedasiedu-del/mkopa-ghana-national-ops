@@ -51,7 +51,7 @@ export function RegionPage() {
       React.createElement("span", null, "⛔"),
       React.createElement("div", null,
         React.createElement("strong", null, haltedDepots.length, " depot", haltedDepots.length === 1 ? "" : "s", " on allocation halt"),
-        " in ", region, " under ", haltPhase.label, " — aged stock (14d+) at or above the phase limit. ",
+        " in ", region, " under ", haltPhase.label, " — aged stock (14d+) above the phase limit. ",
         React.createElement("button", { className: "btn btn-sm", style: { marginLeft: 6 }, onClick: () => goHalts(region) }, "View Halt Status Report →"))),
     React.createElement("div", { className: "kpi-grid" },
       React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),

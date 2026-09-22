@@ -78,7 +78,7 @@ export function NationalOverviewPage() {
       React.createElement("span", null, "⛔"),
       React.createElement("div", null,
         React.createElement("strong", null, haltedDepots.length, " depot", haltedDepots.length === 1 ? "" : "s", " on allocation halt"),
-        " under ", haltPhase.label, " — aged stock (14d+) at or above the phase limit. ",
+        " under ", haltPhase.label, " — aged stock (14d+) above the phase limit. ",
         React.createElement("button", { className: "btn btn-sm", style: { marginLeft: 6 }, onClick: () => goHalts() }, "View Halt Status Report →"))),
     React.createElement("div", { className: "kpi-grid" },
       React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),
