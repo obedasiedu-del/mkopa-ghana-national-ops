@@ -11,7 +11,14 @@ export const SUBMISSION_HISTORY_CAP = 60;
 export const HIGH_AGING_THRESHOLD = 30;
 export const INDIRECT_DEPOT = { code: "INDIRECT", name: "Indirect Channel (All Shops)", region: "National", status: "active" };
 export const UNRECOGNISED_DEPOT = { code: "UNRECOGNISED", name: "Unrecognised Shops", region: "National", status: "active" };
-export const PSEUDO_CODES = [INDIRECT_DEPOT.code, UNRECOGNISED_DEPOT.code];
+// Non-depot supply-chain locations that show up as transfer sources/destinations in stock
+// movement data (warehouses, refurb/repair centres, reverse logistics) -- not real retail
+// depots, so they're modeled the same way as Indirect/Unrecognised: pseudo-depot rows
+// (is_synthetic = true) rather than a schema change.
+export const WAREHOUSE_DEPOT = { code: "WAREHOUSE", name: "Warehouse Stock (All Warehouses)", region: "National", status: "active" };
+export const REFURB_DEPOT = { code: "REFURB", name: "Refurb / Repair Centres", region: "National", status: "active" };
+export const REVLOGISTICS_DEPOT = { code: "REVLOGISTICS", name: "Reverse Logistics", region: "National", status: "active" };
+export const PSEUDO_CODES = [INDIRECT_DEPOT.code, UNRECOGNISED_DEPOT.code, WAREHOUSE_DEPOT.code, REFURB_DEPOT.code, REVLOGISTICS_DEPOT.code];
 // Category names match the approved architecture exactly (Fresh / Projected / Aged /
 // Urgent / High Risk); day ranges are shown alongside them in the UI, not in the label.
 export const LEDGER_TIERS = [
