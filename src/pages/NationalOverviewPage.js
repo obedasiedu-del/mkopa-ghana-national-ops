@@ -47,6 +47,7 @@ export function NationalOverviewPage() {
   const [view, setView] = React.useState("map");
   const stats = overviewStats(data, "national");
   const c = stats.ledgerCounts;
+  const wh = stats.warehousePendingCounts;
   const agedTotal = c.aged + c.urgent + c.highrisk;
   const agedPct = c.total ? Math.round((agedTotal / c.total) * 1000) / 10 : null;
   const totalStock = stats.deviceTotal + c.total;
@@ -84,6 +85,7 @@ export function NationalOverviewPage() {
       React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),
       React.createElement(KpiTile, { label: "Devices at Depots", value: fmtNum(stats.deviceTotal), foot: "current balance, all regions" }),
       React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level, all regions" }),
+      React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent + wh.highrisk) + " aged 14d+ · not yet at depot" }),
       React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
       React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 11d+" }),
       React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),

@@ -70,10 +70,15 @@ export function overviewStats(data, scope) {
     const days = data.submissionsByDepot[d.code] || [];
     if (days.some((s) => s.date === today)) submittedToday++;
   });
+  let warehousePendingCounts = { total: 0, fresh: 0, projected: 0, aged: 0, urgent: 0, highrisk: 0, reallocated: 0, returned: 0 };
+  depots.forEach((d) => {
+    const c = countsForDevices(data.warehousePending[d.code] || []);
+    Object.keys(warehousePendingCounts).forEach((k) => { warehousePendingCounts[k] += c[k]; });
+  });
   return {
     activeDepots: active.length, totalDepots: depots.length,
     scFilled: filled.length, scVacant: active.length - filled.length,
-    deviceTotal, ledgerCounts,
+    deviceTotal, ledgerCounts, warehousePendingCounts,
     submittedToday, expectedSubmissions: active.length,
   };
 }

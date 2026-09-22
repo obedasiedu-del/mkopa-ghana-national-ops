@@ -31,6 +31,7 @@ export function useAppData() {
   const [submissionsByDepot, setSubmissionsByDepot] = React.useState({});
   const [ledgerBaseline, setLedgerBaseline] = React.useState({});
   const [deviceLedger, setDeviceLedger] = React.useState({});
+  const [warehousePending, setWarehousePending] = React.useState({});
   const [loaded, setLoaded] = React.useState(false);
   const [dbError, setDbError] = React.useState(null);
 
@@ -88,19 +89,35 @@ export function useAppData() {
     });
     setDeviceLedger(map);
   }, []);
+  // Warehouse-held stock that's earmarked for a depot but not physically there yet (still
+  // sitting in a warehouse, per the source tracker's own "Warehouse Stock" state) -- kept
+  // separate from device_ledger/stockBalances so it's never mistaken for on-hand stock.
+  const refreshWarehousePending = React.useCallback(async () => {
+    const rows = await fetchAll("warehouse_pending_stock");
+    const map = {};
+    rows.forEach((r) => {
+      if (!map[r.depot_code]) map[r.depot_code] = [];
+      map[r.depot_code].push({
+        serial: r.serial, model: r.model || "", shopName: r.current_owner_label || "",
+        manifestDate: r.manifest_date, allocatedDate: r.warehouse_since_date, initialAllocatedDate: r.warehouse_since_date,
+        status: "in_stock",
+      });
+    });
+    setWarehousePending(map);
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        await Promise.all([refreshDepots(), refreshStockBalances(), refreshSubmissions(), refreshLedgerBaseline(), refreshDeviceLedger()]);
+        await Promise.all([refreshDepots(), refreshStockBalances(), refreshSubmissions(), refreshLedgerBaseline(), refreshDeviceLedger(), refreshWarehousePending()]);
         if (!cancelled) setLoaded(true);
       } catch (e) {
         if (!cancelled) setDbError(e);
       }
     })();
     return () => { cancelled = true; };
-  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger]);
+  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshWarehousePending]);
 
   // Debounced realtime refresh -- a bulk paste can insert thousands of device_ledger rows in one
   // go, and Postgres realtime fires one event PER row; without coalescing, that would trigger
@@ -110,6 +127,7 @@ export function useAppData() {
   const refreshers = {
     depots: refreshDepots, stock_movements: refreshStockBalances,
     submissions: refreshSubmissions, device_ledger_baseline: refreshLedgerBaseline, device_ledger: refreshDeviceLedger,
+    warehouse_pending_stock: refreshWarehousePending,
   };
   React.useEffect(() => {
     const channel = supabaseClient.channel("national-ops-changes");
@@ -315,7 +333,7 @@ export function useAppData() {
   }, []);
 
   return {
-    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger,
+    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending,
     loaded, dbError, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
     saveLedgerBaseline, saveLedgerBaselineBulk, clearAllDeviceLedger, updateDeviceStatus,
