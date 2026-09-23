@@ -6,8 +6,8 @@ import { depotsForScope, ledgerDevices, PSEUDO_DEPOTS } from "../lib/selectors.j
 import { countsForDevices, parsePastedDevices, daysAllocated, agingDate, ledgerTierFor, fmtDateShort, downloadCsv } from "../lib/domain.js";
 
 const LEDGER_MODAL_CHIP_DEFS = [
-  { key: "all", label: "All" }, { key: "fresh", label: "Fresh" }, { key: "projected", label: "Projected" },
-  { key: "aged", label: "Aged" }, { key: "urgent", label: "Urgent" }, { key: "highrisk", label: "High Risk" },
+  { key: "all", label: "All" }, { key: "fresh", label: "Fresh" },
+  { key: "aged", label: "Aged" }, { key: "urgent", label: "14+ Days" },
   { key: "reallocated", label: "Reallocated" }, { key: "returned", label: "Returned" },
 ];
 export function LedgerModal({ depotCode: initialCode }) {
@@ -66,9 +66,9 @@ export function LedgerModal({ depotCode: initialCode }) {
     React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-muted)", margin: "-4px 0 4px" } },
       rec ? `Baseline last set ${fmtDateShort(rec.baselineSetAt.slice(0, 10))} by ${rec.baselineSetBy} · ${devices.length} device(s) on file.` : "No baseline uploaded yet for this depot."),
     rec && React.createElement("div", { style: { display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 12 } }, [
-      ["Fresh (0–5d)", counts.fresh, "var(--success)"], ["Projected (6–10d)", counts.projected, "var(--warning)"],
-      ["Aged (11–13d)", counts.aged, "var(--critical)"], ["Urgent Sale (14–29d)", counts.urgent, "var(--urgent)"],
-      ["High Risk (30d+)", counts.highrisk, "var(--severe)"], ["Reallocated", counts.reallocated, "var(--text-muted)"],
+      ["Fresh (0–9d)", counts.fresh, "var(--success)"],
+      ["Aged (10–13d)", counts.aged, "var(--critical)"], ["14+ Days", counts.urgent, "var(--urgent)"],
+      ["Reallocated", counts.reallocated, "var(--text-muted)"],
       ["Returned", counts.returned, "var(--text-muted)"],
     ].map((row) => React.createElement("div", { key: row[0] },
       React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--text-muted)" } }, row[0]),

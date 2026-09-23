@@ -135,9 +135,9 @@ function DevicesTab({ rec, canWrite }) {
       : React.createElement(React.Fragment, null,
         React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
           React.createElement(KpiTile, { label: "Devices tracked", value: fmtNum(counts.total), foot: "with a DSR or resolved" }),
-          React.createElement(KpiTile, { label: "Fresh (0–5d)", value: fmtNum(counts.fresh), foot: "on track" }),
-          React.createElement(KpiTile, { label: "Aged (11+d)", value: fmtNum(counts.aged + counts.urgent + counts.highrisk), foot: "needs attention" }),
-          React.createElement(KpiTile, { label: "High Risk (30+d)", value: fmtNum(counts.highrisk), foot: "escalate now" })),
+          React.createElement(KpiTile, { label: "Fresh (0–9d)", value: fmtNum(counts.fresh), foot: "on track" }),
+          React.createElement(KpiTile, { label: "Aged (10+d)", value: fmtNum(counts.aged + counts.urgent), foot: "needs attention" }),
+          React.createElement(KpiTile, { label: "14+ Days", value: fmtNum(counts.urgent), foot: "escalate now" })),
         React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 10, gap: 8 } },
           React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("ledger", { depotCode: rec.code }) }, "Open device ledger →")),
         ledgerDvs.length === 0

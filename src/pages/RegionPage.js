@@ -20,7 +20,7 @@ export function RegionPage() {
   const wh = stats.warehousePendingCounts;
   const agedTotal = stats.aged10Plus;
   const agedPct = c.total ? Math.round((agedTotal / c.total) * 1000) / 10 : null;
-  const aged14Total = c.urgent + c.highrisk;
+  const aged14Total = c.urgent;
   const totalStock = stats.deviceTotal + c.total;
   const depots = depotsForScope(data.depots, region);
 
@@ -59,14 +59,13 @@ export function RegionPage() {
       React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),
       React.createElement(KpiTile, { label: "Devices at Depots", value: fmtNum(stats.deviceTotal), foot: "from daily submissions" }),
       React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level" }),
-      React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent + wh.highrisk) + " aged 14d+ · not yet at depot" }),
+      React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
       React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
       React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
       React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
       React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiTile, { label: "Active Depots", value: fmtNum(stats.activeDepots), foot: (stats.totalDepots - stats.activeDepots) + " closed" }),
       React.createElement(KpiTile, { label: "SC Coverage", value: stats.scFilled + "/" + stats.activeDepots, foot: stats.scVacant + " vacant" }),
-      React.createElement(KpiTile, { label: "High Risk (30d+)", value: fmtNum(c.highrisk), foot: "escalate now" }),
       React.createElement(KpiTile, { label: "Allocation Halts", value: fmtNum(haltedDepots.length), foot: haltPhase ? haltPhase.label + " active" : "policy not started" })),
     React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } },
       React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements(region) }, "View Stock Movement Log →"),

@@ -22,11 +22,9 @@ export const PSEUDO_CODES = [INDIRECT_DEPOT.code, UNRECOGNISED_DEPOT.code, WAREH
 // Category names match the approved architecture exactly (Fresh / Projected / Aged /
 // Urgent / High Risk); day ranges are shown alongside them in the UI, not in the label.
 export const LEDGER_TIERS = [
-  { key: "fresh", label: "Fresh", max: 5, cls: "pill-success" },
-  { key: "projected", label: "Projected", min: 6, max: 10, cls: "pill-warning" },
-  { key: "aged", label: "Aged", min: 11, max: 13, cls: "pill-critical" },
-  { key: "urgent", label: "Urgent", min: 14, max: 29, cls: "pill-urgent" },
-  { key: "highrisk", label: "High Risk", min: 30, cls: "pill-severe" },
+  { key: "fresh", label: "Fresh", max: 9, cls: "pill-success" },
+  { key: "aged", label: "Aged", min: 10, max: 13, cls: "pill-critical" },
+  { key: "urgent", label: "14+ Days", min: 14, cls: "pill-urgent" },
 ];
 // The 5 movement categories from the approved architecture (Transfers, Receipts, Issues,
 // Returns, Status changes). A more specific reason (e.g. "allocated to DSR", "sold",
@@ -115,7 +113,7 @@ export function agingDate(dv) {
 }
 // devices: array of {status, allocatedDate, initialAllocatedDate}
 export function countsForDevices(devices) {
-  const counts = { total: 0, fresh: 0, projected: 0, aged: 0, urgent: 0, highrisk: 0, reallocated: 0, returned: 0 };
+  const counts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0 };
   devices.forEach((dv) => {
     counts.total++;
     if (dv.status === "reallocated") {

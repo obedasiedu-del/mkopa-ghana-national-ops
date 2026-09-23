@@ -35,7 +35,7 @@ export function haltStatusForDepot(counts, phase) {
   if (!activePhase) return null;
   const allocated = counts.total;
   const bracket = activePhase.brackets.find((b) => allocated <= b.max) || activePhase.brackets[activePhase.brackets.length - 1];
-  const agedCount = counts.urgent + counts.highrisk; // 14d+
+  const agedCount = counts.urgent; // 14d+ (the "urgent" tier is the 14+ catch-all)
   const halted = agedCount > bracket.limit; // halts once the count exceeds the limit, not merely reaches it
   return { phase: activePhase, allocated, agedCount, limit: bracket.limit, halted };
 }

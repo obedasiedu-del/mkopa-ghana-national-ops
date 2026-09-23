@@ -28,7 +28,7 @@ function AgentsByDsrTable() {
     React.createElement("table", null,
       React.createElement("thead", null, React.createElement("tr", null,
         React.createElement("th", null, "Agent / DSR"), React.createElement("th", null, "Depot(s)"),
-        React.createElement("th", { className: "num" }, "Devices"), React.createElement("th", { className: "num" }, "High Risk"))),
+        React.createElement("th", { className: "num" }, "Devices"), React.createElement("th", { className: "num" }, "14+ Days"))),
       React.createElement("tbody", null,
         groups.length === 0 && React.createElement(EmptyRow, { colSpan: 4 }, "No devices with DSRs on file yet."),
         groups.map((g) => {
@@ -38,7 +38,7 @@ function AgentsByDsrTable() {
             React.createElement("td", null, g.name),
             React.createElement("td", null, depotNames.length <= 1 ? (depotNames[0] || "—") : depotNames.length + " depots"),
             React.createElement("td", { className: "num", style: { fontWeight: 600 } }, c.total),
-            React.createElement("td", { className: "num" }, c.highrisk));
+            React.createElement("td", { className: "num" }, c.urgent));
         }))));
 }
 
@@ -50,7 +50,7 @@ export function NationalOverviewPage() {
   const wh = stats.warehousePendingCounts;
   const agedTotal = stats.aged10Plus;
   const agedPct = c.total ? Math.round((agedTotal / c.total) * 1000) / 10 : null;
-  const aged14Total = c.urgent + c.highrisk;
+  const aged14Total = c.urgent;
   const totalStock = stats.deviceTotal + c.total;
   const canBulkEdit = isAdmin(auth.role);
 
@@ -86,14 +86,13 @@ export function NationalOverviewPage() {
       React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),
       React.createElement(KpiTile, { label: "Devices at Depots", value: fmtNum(stats.deviceTotal), foot: "from daily submissions, all regions" }),
       React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level, all regions" }),
-      React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent + wh.highrisk) + " aged 14d+ · not yet at depot" }),
+      React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
       React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
       React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
       React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
       React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiTile, { label: "Active Depots", value: fmtNum(stats.activeDepots), foot: (stats.totalDepots - stats.activeDepots) + " closed" }),
       React.createElement(KpiTile, { label: "SC Coverage", value: stats.scFilled + "/" + stats.activeDepots, foot: stats.scVacant + " vacant" }),
-      React.createElement(KpiTile, { label: "High Risk (30d+)", value: fmtNum(c.highrisk), foot: "escalate now" }),
       React.createElement(KpiTile, { label: "Allocation Halts", value: fmtNum(haltedDepots.length), foot: haltPhase ? haltPhase.label + " active" : "policy not started" })),
     React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 22 } },
       React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements() }, "View Stock Movement Log →"),
