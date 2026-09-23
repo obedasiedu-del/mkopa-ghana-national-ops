@@ -1,8 +1,8 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { REGION_ORDER } from "../lib/domain.js";
-import { depotsForScope, activeDepots, depotStockTotals } from "../lib/selectors.js";
+import { REGION_ORDER, submissionTotals } from "../lib/domain.js";
+import { depotsForScope, activeDepots, latestSubmissionForDepot } from "../lib/selectors.js";
 import { GHANA_MAP_VIEWBOX, GHANA_REGION_PATHS, GHANA_LABEL_POINTS, GHANA_DEPOT_PINS } from "../data/ghana-map-data.js";
 
 // Colors are a validated categorical palette (dataviz skill) chosen so every pair of regions
@@ -31,7 +31,10 @@ export function GhanaMap() {
     const active = activeDepots(depots);
     const filled = active.filter((d) => d.scStatus === "active");
     let deviceTotal = 0;
-    depots.forEach((d) => { deviceTotal += depotStockTotals(data.stockBalances, d.code).remaining; });
+    depots.forEach((d) => {
+      const latest = latestSubmissionForDepot(data.submissionsByDepot, d.code);
+      deviceTotal += latest ? submissionTotals(latest).totalStock : 0;
+    });
     return { depots: active.length, scFilled: filled.length, deviceTotal };
   }, [data]);
   const selectedDepots = selected ? depotsForScope(data.depots, selected) : [];

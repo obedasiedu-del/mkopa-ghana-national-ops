@@ -39,7 +39,18 @@ export function movementsForScope(movements, depots, scope) {
   if (scope === "national") return movements;
   return movements.filter((m) => codes.has(m.depotCode) || codes.has(m.toDepotCode));
 }
-// Devices at Depot totals for one depot: { received, issued, remaining } summed across models.
+// Most recent Daily Submission entry for one depot (submissionsByDepot[code] is sorted
+// ascending by date), or null if the depot has never submitted. "Devices at Depot" is driven
+// by this -- an opening-stock snapshot the depot reports each day -- rather than by recorded
+// stock movements; a depot that hasn't submitted yet today keeps showing its last submitted
+// count rather than dropping to zero.
+export function latestSubmissionForDepot(submissionsByDepot, depotCode) {
+  const days = submissionsByDepot[depotCode] || [];
+  return days.length ? days[days.length - 1] : null;
+}
+// Devices at Depot totals for one depot, from movement history: { received, issued,
+// remaining } summed across models. No longer used for the "current stock" figure (see
+// latestSubmissionForDepot) -- kept for the separate movement-history view.
 export function depotStockTotals(stockBalances, depotCode) {
   const models = stockBalances[depotCode] || {};
   const totals = { received: 0, issued: 0, remaining: 0 };
@@ -57,7 +68,10 @@ export function overviewStats(data, scope) {
   const active = activeDepots(depots);
   const filled = active.filter((d) => d.scStatus === "active");
   let deviceTotal = 0;
-  depots.forEach((d) => { deviceTotal += depotStockTotals(data.stockBalances, d.code).remaining; });
+  depots.forEach((d) => {
+    const latest = latestSubmissionForDepot(data.submissionsByDepot, d.code);
+    deviceTotal += latest ? submissionTotals(latest).totalStock : 0;
+  });
   const ledgerDepots = ledgerDepotsForScope(data.depots, scope);
   let ledgerCounts = { total: 0, fresh: 0, projected: 0, aged: 0, urgent: 0, highrisk: 0, reallocated: 0, returned: 0 };
   ledgerDepots.forEach((d) => {

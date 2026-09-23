@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { canWriteDepot } from "../data/useAuth.js";
 import { KpiTile, Pill, ScStatusPill, ScoreCell, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, LedgerAgingBadge, HaltBanner } from "../components/ui.js";
 import { DataTable } from "../components/DataTable.js";
-import { ledgerDevices, depotStockTotals } from "../lib/selectors.js";
+import { ledgerDevices, depotStockTotals, latestSubmissionForDepot } from "../lib/selectors.js";
 import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
   SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
@@ -77,6 +77,8 @@ function DevicesTab({ rec, canWrite }) {
   const balances = data.stockBalances[rec.code] || {};
   const models = Object.keys(balances).sort();
   const depotTotals = depotStockTotals(data.stockBalances, rec.code);
+  const latestSubmission = latestSubmissionForDepot(data.submissionsByDepot, rec.code);
+  const subTotals = latestSubmission ? submissionTotals(latestSubmission) : null;
 
   const ledgerDvs = ledgerDevices(data.deviceLedger, rec.code);
   const counts = countsForDevices(ledgerDvs);
@@ -97,22 +99,37 @@ function DevicesTab({ rec, canWrite }) {
         React.createElement(FieldTextarea, { label: "Notes", value: scNotes, onChange: setScNotes }),
         canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveSc }, "Save Stock Controller")),
       React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-        React.createElement(KpiTile, { label: "Available (remaining)", value: fmtNum(depotTotals.remaining), foot: "current balance" }),
-        React.createElement(KpiTile, { label: "Received", value: fmtNum(depotTotals.received), foot: "all-time, this depot" }),
-        React.createElement(KpiTile, { label: "Issued", value: fmtNum(depotTotals.issued), foot: "all-time, this depot" })),
+        React.createElement(KpiTile, { label: "Devices at Depot", value: subTotals ? fmtNum(subTotals.totalStock) : "—", foot: latestSubmission ? "from daily submission · " + fmtDateShort(latestSubmission.date) : "no daily submission yet" }),
+        React.createElement(KpiTile, { label: "Aged (11d+, reported)", value: subTotals ? fmtNum(subTotals.agedStock) : "—", foot: "self-reported in submission" }),
+        React.createElement(KpiTile, { label: "Received (movements)", value: fmtNum(depotTotals.received), foot: "all-time transfer history" }),
+        React.createElement(KpiTile, { label: "Issued (movements)", value: fmtNum(depotTotals.issued), foot: "all-time transfer history" })),
+      React.createElement("div", { className: "table-wrap", style: { marginBottom: 16 } },
+        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px 0" } },
+          React.createElement("div", { className: "drawer-section-title", style: { marginBottom: 0 } }, "Devices at Depot by model"),
+          canWrite && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("submission", { depotCode: rec.code }) }, latestSubmission ? "Edit today's submission" : "+ New Submission")),
+        !latestSubmission
+          ? React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No daily submission on file for this depot yet. Use \"New Submission\" to enter today's opening stock.")
+          : React.createElement("table", null,
+            React.createElement("thead", null, React.createElement("tr", null,
+              React.createElement("th", null, "Model"), React.createElement("th", { className: "num" }, "Total Stock"), React.createElement("th", { className: "num" }, "Aged Stock"))),
+            React.createElement("tbody", null, SUBMISSION_MODELS.map((m) => {
+              const r = latestSubmission.models && latestSubmission.models[m];
+              return React.createElement("tr", { key: m },
+                React.createElement("td", { className: "mono" }, m),
+                React.createElement("td", { className: "num", style: { fontWeight: 600 } }, fmtNum(r ? r.totalStock : 0)),
+                React.createElement("td", { className: "num" }, fmtNum(r ? r.agedStock : 0)));
+            })))),
       React.createElement("div", { className: "table-wrap" },
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 16px 0" } },
-          React.createElement("div", { className: "drawer-section-title", style: { marginBottom: 0 } }, "Stock by model"),
+          React.createElement("div", { className: "drawer-section-title", style: { marginBottom: 0 } }, "Movement History by Model (all-time)"),
           canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => openModal("recordMovement", { depotCode: rec.code }) }, "+ Record Movement")),
         models.length === 0
           ? React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No stock movements recorded yet for this depot. Use \"Record Movement\" to log a receipt.")
           : React.createElement("table", null,
             React.createElement("thead", null, React.createElement("tr", null,
-              React.createElement("th", null, "Model"), React.createElement("th", { className: "num" }, "Available"),
-              React.createElement("th", { className: "num" }, "Received"), React.createElement("th", { className: "num" }, "Issued"))),
+              React.createElement("th", null, "Model"), React.createElement("th", { className: "num" }, "Received"), React.createElement("th", { className: "num" }, "Issued"))),
             React.createElement("tbody", null, models.map((m) => React.createElement("tr", { key: m },
               React.createElement("td", { className: "mono" }, m),
-              React.createElement("td", { className: "num", style: { fontWeight: 600 } }, fmtNum(balances[m].remaining)),
               React.createElement("td", { className: "num" }, fmtNum(balances[m].received)),
               React.createElement("td", { className: "num" }, fmtNum(balances[m].issued))))))))
       : React.createElement(React.Fragment, null,
