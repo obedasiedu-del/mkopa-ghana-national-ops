@@ -168,7 +168,7 @@ export function splitPasteLines(text) {
 // force everyone to reorder columns before pasting, the first row is sniffed for recognised
 // header names and mapped by name; only if that fails do we fall back to the original fixed
 // 5-column order (Serial, Product, Shop Name, DSR Name, Device Age).
-const DEVICE_COLUMN_ALIASES = {
+export const DEVICE_COLUMN_ALIASES = {
   serial: ["serialnumber", "serial number", "serial"],
   model: ["product", "model", "itemtypecode", "item type code", "item type", "sku"],
   shopName: ["shopname", "shop name", "shop", "depot", "outlet", "outletname"],
@@ -180,7 +180,7 @@ const DEVICE_COLUMN_ALIASES = {
 function normalizeHeaderCell(s) {
   return String(s || "").trim().toLowerCase().replace(/[_\s]+/g, " ");
 }
-function detectDeviceColumnMap(headerCells) {
+export function detectDeviceColumnMap(headerCells) {
   const norm = headerCells.map(normalizeHeaderCell);
   const map = {};
   Object.keys(DEVICE_COLUMN_ALIASES).forEach((field) => {
@@ -193,7 +193,7 @@ function detectDeviceColumnMap(headerCells) {
 }
 // Accepts "2026-09-19" (incl. datetime), "9/19/2026", or a raw Excel serial date number --
 // the shapes a cell can paste as depending on its source formatting.
-function parseFlexibleDate(raw) {
+export function parseFlexibleDate(raw) {
   const s = String(raw || "").trim();
   if (!s) return null;
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);

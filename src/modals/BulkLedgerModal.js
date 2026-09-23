@@ -4,6 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { Modal } from "../components/ui.js";
 import { depotsForScope } from "../lib/selectors.js";
 import { parsePastedDevicesMultiDepot, splitPasteLines, downloadCsv } from "../lib/domain.js";
+import { readWorkbook, guessDeviceRegisterSheet, readDeviceRegisterSheet } from "../lib/xlsxImport.js";
 
 // A textarea holding several thousand pasted lines is slow for the browser to lay out on its
 // own, before any of our code runs. So the textarea here is uncontrolled (a plain ref, not React
@@ -23,6 +24,12 @@ export function BulkLedgerModal() {
   const [summary, setSummary] = React.useState(null);
   const [parsing, setParsing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [workbook, setWorkbook] = React.useState(null);
+  const [sheetName, setSheetName] = React.useState("");
+  const [fileInfo, setFileInfo] = React.useState(null); // { fileName, totalRows, correctedDates, dateAnomalies, refDateUsed }
+  const [fileError, setFileError] = React.useState(null);
+  const [readingFile, setReadingFile] = React.useState(false);
+  const fileInputRef = React.useRef(null);
   function getPasteText() { return rawTextRef.current || (textareaRef.current ? textareaRef.current.value : ""); }
   function scheduleSummary() {
     setParsing(true);
@@ -50,7 +57,52 @@ export function BulkLedgerModal() {
   function onInput() {
     if (suppressNextInputRef.current) { suppressNextInputRef.current = false; return; }
     rawTextRef.current = "";
+    setWorkbook(null); setSheetName(""); setFileInfo(null); setFileError(null);
     scheduleSummary();
+  }
+  function loadSheet(wb, name) {
+    try {
+      const result = readDeviceRegisterSheet(wb, name);
+      rawTextRef.current = result.textRows.join("\n");
+      suppressNextInputRef.current = true;
+      if (textareaRef.current) {
+        textareaRef.current.value = `[File loaded: ${result.totalRows} rows from sheet "${name}" — too many to display here, but ready to process. Click "Save Baseline" below.]`;
+      }
+      setFileInfo({ totalRows: result.totalRows, correctedDates: result.correctedDates, dateAnomalies: result.dateAnomalies, refDateUsed: result.refDateUsed });
+      setFileError(null);
+      scheduleSummary();
+    } catch (e) {
+      setFileError(e.message || String(e));
+      setFileInfo(null);
+    }
+  }
+  async function onFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setReadingFile(true);
+    setFileError(null);
+    try {
+      const wb = await readWorkbook(file);
+      const guessed = guessDeviceRegisterSheet(wb);
+      setWorkbook(wb);
+      setSheetName(guessed);
+      loadSheet(wb, guessed);
+    } catch (err) {
+      setFileError("Couldn't read that file: " + (err.message || String(err)));
+      setWorkbook(null);
+    } finally {
+      setReadingFile(false);
+    }
+  }
+  function onSheetChange(e) {
+    const name = e.target.value;
+    setSheetName(name);
+    if (workbook) loadSheet(workbook, name);
+  }
+  function anomalyDownload() {
+    const rows = [["Serial Number", "Initial Allocation Date (as read)", "Device Age (from sheet)", "Days implied by date"]];
+    fileInfo.dateAnomalies.forEach((a) => rows.push([a.serial, a.initialAllocatedDate, a.deviceAge, a.impliedAge]));
+    downloadCsv("date-anomalies.csv", rows);
   }
   function saveBaseline() {
     const raw = getPasteText();
@@ -76,9 +128,22 @@ export function BulkLedgerModal() {
     !depotsLoaded && React.createElement("div", { className: "banner", style: { marginBottom: 10 } },
       React.createElement("span", null, "⚠"),
       React.createElement("div", null, "The depot list hasn't finished loading yet — pasting now would match nothing and dump every device into \"Unrecognised Shops\". Close this, wait a couple seconds, then reopen.")),
-    React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-muted)", marginBottom: 10 } }, "Paste your full device export — every depot at once, straight from Excel. Include the header row and it auto-detects columns by name (Serial Number / SerialNumber, Product / Model / ItemTypeCode, Shop Name / ShopName, DSR Name / DSRName, and either an Allocation Date or a Device Age column) in whatever order your sheet has them — no need to reorder first. No header row falls back to a fixed order: Serial Number, Product, Shop Name, DSR Name, Device Age (days). Each row is matched to a depot by Shop Name; a shop name from a known indirect-channel partner (MTN, Telecel, Franko, izone, MCS, etc.) goes to the \"Indirect Channel\" bucket, and anything else unrecognised goes to the \"Unrecognised Shops\" bucket — nothing is dropped. Depots present in this paste have their device list replaced; others are left untouched. Every device starts \"In Stock\" — mark one Reallocated from its device table once it's recovered."),
+    React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-muted)", marginBottom: 10 } }, "Upload the device export file directly, or paste rows below — every depot at once, straight from Excel. It auto-detects columns by name (Serial Number / SerialNumber, Product / Model / ItemTypeCode, Shop Name / ShopName, DSR Name / DSRName, Initial/Current Allocation Date, Device Age) in whatever order your sheet has them. A file upload also cross-checks each row's Initial Allocation Date against the sheet's own Device Age column and auto-corrects a known export defect (some date cells come through with month and day swapped) — anything it can't resolve is flagged, not silently trusted. Each row is matched to a depot by Shop Name; a shop name from a known indirect-channel partner (MTN, Telecel, Franko, izone, MCS, etc.) goes to the \"Indirect Channel\" bucket, and anything else unrecognised goes to the \"Unrecognised Shops\" bucket — nothing is dropped. Depots present in this upload have their device list replaced; others are left untouched. Every device starts \"In Stock\" — mark one Reallocated from its device table once it's recovered."),
     React.createElement("div", { className: "field-row" },
-      React.createElement("div", { className: "field-label" }, "Paste device rows (all depots)"),
+      React.createElement("div", { className: "field-label" }, "Upload Excel file (.xlsx)"),
+      React.createElement("input", { ref: fileInputRef, type: "file", accept: ".xlsx,.xls", onChange: onFileChange, disabled: readingFile }),
+      workbook && workbook.SheetNames.length > 1 && React.createElement("select", { className: "field-input", style: { marginTop: 6, maxWidth: 320 }, value: sheetName, onChange: onSheetChange },
+        workbook.SheetNames.map((n) => React.createElement("option", { key: n, value: n }, n))),
+      readingFile && React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 4 } }, "Reading file…"),
+      fileError && React.createElement("div", { style: { fontSize: 12, color: "var(--danger, #c0392b)", marginTop: 4 } }, fileError),
+      fileInfo && React.createElement("div", { style: { fontSize: 12, marginTop: 4 } },
+        React.createElement("div", { style: { color: "var(--success)" } }, fileInfo.totalRows, " rows read from the file", fileInfo.refDateUsed ? " (reference date " + fileInfo.refDateUsed + ")" : "", "."),
+        fileInfo.correctedDates > 0 && React.createElement("div", { style: { color: "var(--text-muted)" } }, fileInfo.correctedDates, " date", fileInfo.correctedDates === 1 ? "" : "s", " auto-corrected (month/day swap matched against Device Age)."),
+        fileInfo.dateAnomalies.length > 0 && React.createElement("div", { style: { color: "var(--warning)", display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" } },
+          React.createElement("span", null, fileInfo.dateAnomalies.length, " row", fileInfo.dateAnomalies.length === 1 ? "" : "s", " have a date that still doesn't match the sheet's Device Age — kept as read, review before trusting their aging."),
+          React.createElement("button", { className: "btn btn-ghost btn-sm", onClick: anomalyDownload }, "📥 Download")))),
+    React.createElement("div", { className: "field-row" },
+      React.createElement("div", { className: "field-label" }, "…or paste device rows (all depots)"),
       React.createElement("textarea", { ref: textareaRef, className: "field-input", rows: 10, placeholder: "SN12345\tA07/64\tKasoa Main Shop\tKwame Mensah\t12\nSN67890\tA16/128\tCape Coast Shop\tAma Boateng\t3", defaultValue: "", onPaste, onInput })),
     React.createElement("div", { className: "field-row" },
       React.createElement("div", { className: "field-label" }, "Set by (your name)"),
