@@ -38,6 +38,47 @@ export function sheetLooksLikeDeviceRegister(wb, sheetName) {
   return map.serial !== undefined && map.shopName !== undefined;
 }
 
+// Same idea for the "WH STOCKS" sheet of a tracker like INDIRECT_INVENTORY_TRACKER --
+// prefer a sheet named for it, else sniff for its distinctive Current Owner Code column.
+export function guessWarehouseStockSheet(wb) {
+  const byName = wb.SheetNames.find((n) => /wh stocks|warehouse stock/i.test(n));
+  if (byName) return byName;
+  const byHeader = wb.SheetNames.find((n) => {
+    const header = sheetHeaderRow(wb.Sheets[n]).map(normalizeHeader);
+    return header.some((h) => h.indexOf("currentownercode") !== -1) && header.some((h) => h.indexOf("serial") !== -1);
+  });
+  return byHeader || wb.SheetNames[0];
+}
+export function sheetLooksLikeWarehouseStock(wb, sheetName) {
+  const header = sheetHeaderRow(wb.Sheets[sheetName]).map(normalizeHeader);
+  return header.some((h) => h.indexOf("currentownercode") !== -1) && header.some((h) => h.indexOf("serial") !== -1);
+}
+// A warehouse-stock export runs 50-100k+ rows -- the per-cell address lookup used for the
+// (much smaller) Device Register sheet, so it can distinguish native-date cells from text
+// ones, would be too slow here. sheet_to_json is a single optimized pass; we lose that
+// cell-type distinction, but a direct cross-check against this sheet's own FIFO DAYS column
+// (20,000-row sample, 2026-09-23 as reference) found zero date anomalies in this export, so
+// there's no known defect here to guard against the way there was for the aged-stock sheet.
+export function readWarehouseStockSheet(wb, sheetName) {
+  const ws = wb.Sheets[sheetName];
+  const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "", blankrows: false });
+  if (!aoa.length) return { textRows: [], totalRows: 0 };
+  const header = aoa[0].map((h) => String(h === undefined || h === null ? "" : h));
+  const textRows = [header.join("\t")];
+  let totalRows = 0;
+  for (let i = 1; i < aoa.length; i++) {
+    const row = aoa[i];
+    if (!row || row.every((c) => c === "" || c === null || c === undefined)) continue;
+    totalRows++;
+    const cells = row.map((c) => {
+      if (c instanceof Date) return dateToISO(c);
+      return String(c === undefined || c === null ? "" : c).replace(/\t/g, " ");
+    });
+    textRows.push(cells.join("\t"));
+  }
+  return { textRows, totalRows };
+}
+
 function excelSerialToDate(serial) {
   return new Date(Math.round((serial - 25569) * 86400000));
 }

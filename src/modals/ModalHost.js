@@ -4,6 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { SubmissionModal } from "./SubmissionModal.js";
 import { LedgerModal } from "./LedgerModal.js";
 import { BulkLedgerModal } from "./BulkLedgerModal.js";
+import { BulkWarehouseStockModal } from "./BulkWarehouseStockModal.js";
 import { BulkDepotStockModal } from "./BulkDepotStockModal.js";
 import { BulkMovementModal } from "./BulkMovementModal.js";
 import { AgentLedgerModal } from "./AgentLedgerModal.js";
@@ -17,6 +18,7 @@ export function ModalHost() {
     case "submission": return React.createElement(SubmissionModal, { ...modal.props });
     case "ledger": return React.createElement(LedgerModal, { ...modal.props });
     case "bulkLedger": return React.createElement(BulkLedgerModal, { ...modal.props });
+    case "bulkWarehouseStock": return React.createElement(BulkWarehouseStockModal, { ...modal.props });
     case "bulkDepotStock": return React.createElement(BulkDepotStockModal, { ...modal.props });
     case "bulkMovement": return React.createElement(BulkMovementModal, { ...modal.props });
     case "agentLedger": return React.createElement(AgentLedgerModal, { ...modal.props });

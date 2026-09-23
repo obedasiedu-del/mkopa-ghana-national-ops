@@ -354,6 +354,104 @@ export function parsePastedDevicesMultiDepot(text, depots) {
   });
   return { byDepot, skipped, indirectCounts, unrecognisedCounts, indirectRows, unrecognisedRows };
 }
+// A warehouse-stock export's "owner code" is the same depot code but sometimes with an extra
+// leading zero (SC092 for our SC92) -- normalizing letters+digits separately and stripping
+// leading zeros off the digits catches that without touching genuinely different codes.
+export function normalizeOwnerCode(code) {
+  const raw = String(code || "").trim();
+  const m = raw.match(/^([A-Za-z-]+)0*(\d+)$/);
+  if (!m) return raw.toLowerCase();
+  return (m[1] + m[2]).toLowerCase();
+}
+// Warehouse/Refurb/Reverse-Logistics/Indirect/Unrecognised are real (synthetic) rows in the
+// depots table, so matchDepotForShop already resolves an owner code or name that names one of
+// them directly -- this only adds the leading-zero code variant and a name-based fallback on
+// top of that, before finally bucketing into Indirect Channel / Unrecognised like the device
+// ledger import does.
+export function matchDepotForOwner(code, name, depotIndex) {
+  const byCode = matchDepotForShop(code, depotIndex);
+  if (byCode) return { code: byCode, bucket: "depot" };
+  const normCode = normalizeOwnerCode(code);
+  if (normCode) {
+    const hit = depotIndex.find((d) => normalizeOwnerCode(d.code) === normCode);
+    if (hit) return { code: hit.code, bucket: "depot" };
+  }
+  const byName = matchDepotForShop(name, depotIndex);
+  if (byName) return { code: byName, bucket: "depot" };
+  if (isIndirectChannelShop(name) || isIndirectChannelShop(code)) return { code: INDIRECT_DEPOT.code, bucket: "indirect" };
+  return { code: UNRECOGNISED_DEPOT.code, bucket: "unrecognised" };
+}
+const WAREHOUSE_COLUMN_ALIASES = {
+  serial: ["serialnumber", "serial number", "serial"],
+  model: ["device", "product", "model", "sku", "itemtypecode", "item type code"],
+  ownerCode: ["currentownercode", "current owner code", "owner code", "ownercode"],
+  ownerName: ["currentowner", "current owner", "owner", "owner name", "ownername"],
+  manifestDate: ["manifestdate", "manifest date"],
+  sinceDate: ["datecurrentstateattained", "date current state attained", "warehouse since date", "since date"],
+};
+function detectWarehouseColumnMap(headerCells) {
+  const norm = headerCells.map(normalizeHeaderCell);
+  const map = {};
+  Object.keys(WAREHOUSE_COLUMN_ALIASES).forEach((field) => {
+    for (const alias of WAREHOUSE_COLUMN_ALIASES[field]) {
+      const idx = norm.indexOf(alias);
+      if (idx !== -1) { map[field] = idx; return; }
+    }
+  });
+  return map;
+}
+function parseWarehouseRow(cells, columnMap) {
+  const map = columnMap || {};
+  const serial = (map.serial !== undefined ? cells[map.serial] : "") || "";
+  if (!serial) return null;
+  const model = (map.model !== undefined ? cells[map.model] : "") || "";
+  const ownerCode = (map.ownerCode !== undefined ? cells[map.ownerCode] : "") || "";
+  const ownerName = (map.ownerName !== undefined ? cells[map.ownerName] : "") || "";
+  const manifestDate = map.manifestDate !== undefined ? parseFlexibleDate(cells[map.manifestDate]) : null;
+  const sinceDate = map.sinceDate !== undefined ? parseFlexibleDate(cells[map.sinceDate]) : null;
+  return { serial, model, ownerCode, ownerName, manifestDate, sinceDate };
+}
+// Same shape of job as parsePastedDevicesMultiDepot, but for a warehouse-stock export: rows
+// are keyed by an owner code + a descriptive owner name rather than a single shop name, and
+// there's no header-less fallback -- a file this large is never hand-typed without a header.
+export function parsePastedWarehouseStock(text, depots) {
+  const lines = splitPasteLines(text);
+  const byDepot = {};
+  let skipped = 0;
+  const indirectCounts = {}, unrecognisedCounts = {}, indirectRows = [], unrecognisedRows = [];
+  if (!lines.length) return { byDepot, skipped, indirectCounts, unrecognisedCounts, indirectRows, unrecognisedRows };
+  const headerCells = (lines[0].indexOf("\t") !== -1 ? lines[0].split("\t") : lines[0].split(",")).map((c) => c.trim());
+  const columnMap = detectWarehouseColumnMap(headerCells);
+  const isHeader = columnMap.serial !== undefined && Object.keys(columnMap).length >= 2;
+  const dataLines = isHeader ? lines.slice(1) : [];
+  const depotIndex = buildDepotIndex(depots);
+  const classifyCache = {};
+  function classifyCached(ownerCode, ownerName) {
+    const key = normalizeDepotName(ownerCode) + "\u0001" + normalizeDepotName(ownerName);
+    if (!(key in classifyCache)) classifyCache[key] = matchDepotForOwner(ownerCode, ownerName, depotIndex);
+    return classifyCache[key];
+  }
+  dataLines.forEach((line) => {
+    let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
+    cells = cells.map((c) => c.trim());
+    const row = parseWarehouseRow(cells, columnMap);
+    if (!row) { skipped++; return; }
+    const cls = classifyCached(row.ownerCode, row.ownerName);
+    if (!byDepot[cls.code]) byDepot[cls.code] = [];
+    byDepot[cls.code].push({
+      serial: row.serial, model: row.model, ownerLabel: row.ownerName || row.ownerCode,
+      manifestDate: row.manifestDate, sinceDate: row.sinceDate,
+    });
+    if (cls.bucket !== "depot") {
+      const key = row.ownerName || row.ownerCode || "(blank owner)";
+      const counts = cls.bucket === "indirect" ? indirectCounts : unrecognisedCounts;
+      const rowsArr = cls.bucket === "indirect" ? indirectRows : unrecognisedRows;
+      counts[key] = (counts[key] || 0) + 1;
+      rowsArr.push(row);
+    }
+  });
+  return { byDepot, skipped, indirectCounts, unrecognisedCounts, indirectRows, unrecognisedRows };
+}
 export function parseDepotStockPaste(text, depots) {
   const lines = splitPasteLines(text);
   const depotIndex = buildDepotIndex(depots);

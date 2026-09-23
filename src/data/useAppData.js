@@ -197,6 +197,34 @@ export function useAppData() {
     await Promise.all([refreshDeviceLedger(), refreshLedgerBaseline()]);
     return codes.reduce((sum, c) => sum + byDepotMap[c].length, 0);
   }, [writeLedgerBaseline, refreshDeviceLedger, refreshLedgerBaseline]);
+  // Full-replace write for one depot's warehouse-pending rows -- same delete-then-insert
+  // shape as writeLedgerBaseline, but there's no baseline table for this one.
+  const writeWarehousePending = React.useCallback(async (depotCode, rowsArr) => {
+    const { error: delErr } = await supabaseClient.from("warehouse_pending_stock").delete().eq("depot_code", depotCode);
+    if (delErr) throw delErr;
+    // warehouse_since_date is NOT NULL -- a row missing it (and with no Manifest Date to
+    // fall back to either) can't be placed on the aging clock this table exists for, so it's
+    // dropped here rather than failing the whole chunk's insert.
+    const usable = rowsArr.filter((r) => r.sinceDate || r.manifestDate);
+    if (usable.length) {
+      const rows = usable.map((r) => ({
+        depot_code: depotCode, serial: r.serial, model: r.model || "",
+        current_owner_label: r.ownerLabel || "", manifest_date: r.manifestDate || null,
+        warehouse_since_date: r.sinceDate || r.manifestDate,
+      }));
+      for (const batch of chunkArr(rows, 500)) {
+        const { error } = await supabaseClient.from("warehouse_pending_stock").insert(batch);
+        if (error) throw error;
+      }
+    }
+  }, []);
+  const saveWarehousePendingBulk = React.useCallback(async (byDepotMap) => {
+    const codes = Object.keys(byDepotMap);
+    if (!codes.length) throw new Error("No matched rows to save yet — check the owner codes/names.");
+    await Promise.all(codes.map((code) => writeWarehousePending(code, byDepotMap[code])));
+    await refreshWarehousePending();
+    return codes.reduce((sum, c) => sum + byDepotMap[c].length, 0);
+  }, [writeWarehousePending, refreshWarehousePending]);
   const clearAllDeviceLedger = React.useCallback(async () => {
     const { error: e1 } = await supabaseClient.from("device_ledger").delete().neq("depot_code", "__none__");
     if (e1) throw e1;
@@ -336,7 +364,7 @@ export function useAppData() {
     depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending,
     loaded, dbError, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
-    saveLedgerBaseline, saveLedgerBaselineBulk, clearAllDeviceLedger, updateDeviceStatus,
+    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
   };
 }
