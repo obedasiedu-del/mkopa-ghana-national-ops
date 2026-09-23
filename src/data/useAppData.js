@@ -24,6 +24,22 @@ function chunkArr(arr, size) {
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
 }
+// Firing one write per depot all at once (Promise.all across 80-100+ depots) was enough
+// concurrent load against Supabase to trip a statement timeout on a large upload (a
+// depot's DELETE landing but its replacement INSERT never finishing is the failure mode
+// that actually loses data) -- a small fixed concurrency keeps throughput reasonable
+// without hammering the database with that many simultaneous connections.
+async function runWithConcurrency(items, limit, fn) {
+  let next = 0;
+  async function worker() {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
 
 export function useAppData() {
   const [depots, setDepots] = React.useState({});
@@ -193,7 +209,7 @@ export function useAppData() {
     if (!setBy || !String(setBy).trim()) throw new Error("Your name is required");
     const codes = Object.keys(byDepotMap);
     if (!codes.length) throw new Error("No matched devices to save yet — check the shop names.");
-    await Promise.all(codes.map((code) => writeLedgerBaseline(code, setBy, byDepotMap[code])));
+    await runWithConcurrency(codes, 4, (code) => writeLedgerBaseline(code, setBy, byDepotMap[code]));
     await Promise.all([refreshDeviceLedger(), refreshLedgerBaseline()]);
     return codes.reduce((sum, c) => sum + byDepotMap[c].length, 0);
   }, [writeLedgerBaseline, refreshDeviceLedger, refreshLedgerBaseline]);
@@ -221,7 +237,7 @@ export function useAppData() {
   const saveWarehousePendingBulk = React.useCallback(async (byDepotMap) => {
     const codes = Object.keys(byDepotMap);
     if (!codes.length) throw new Error("No matched rows to save yet — check the owner codes/names.");
-    await Promise.all(codes.map((code) => writeWarehousePending(code, byDepotMap[code])));
+    await runWithConcurrency(codes, 4, (code) => writeWarehousePending(code, byDepotMap[code]));
     await refreshWarehousePending();
     return codes.reduce((sum, c) => sum + byDepotMap[c].length, 0);
   }, [writeWarehousePending, refreshWarehousePending]);
