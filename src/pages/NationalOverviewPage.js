@@ -48,8 +48,9 @@ export function NationalOverviewPage() {
   const stats = overviewStats(data, "national");
   const c = stats.ledgerCounts;
   const wh = stats.warehousePendingCounts;
-  const agedTotal = c.aged + c.urgent + c.highrisk;
+  const agedTotal = stats.aged10Plus;
   const agedPct = c.total ? Math.round((agedTotal / c.total) * 1000) / 10 : null;
+  const aged14Total = c.urgent + c.highrisk;
   const totalStock = stats.deviceTotal + c.total;
   const canBulkEdit = isAdmin(auth.role);
 
@@ -87,7 +88,8 @@ export function NationalOverviewPage() {
       React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level, all regions" }),
       React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent + wh.highrisk) + " aged 14d+ · not yet at depot" }),
       React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
-      React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 11d+" }),
+      React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
+      React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
       React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiTile, { label: "Active Depots", value: fmtNum(stats.activeDepots), foot: (stats.totalDepots - stats.activeDepots) + " closed" }),
       React.createElement(KpiTile, { label: "SC Coverage", value: stats.scFilled + "/" + stats.activeDepots, foot: stats.scVacant + " vacant" }),

@@ -128,6 +128,19 @@ export function countsForDevices(devices) {
   });
   return counts;
 }
+// Counts devices at or past an exact day threshold, independent of the fixed
+// Fresh/Projected/Aged/Urgent/High Risk tier boundaries above (those stay as they are --
+// the Halt Policy phases are built on the 14-day "Urgent + High Risk" boundary specifically,
+// so they aren't touched here). Used for the Stock Aging KPI's own thresholds.
+export function countsAtDayThreshold(devices, threshold) {
+  let n = 0;
+  devices.forEach((dv) => {
+    if (dv.status === "reallocated") return;
+    const days = daysAllocated(agingDate(dv));
+    if (days !== null && days >= threshold) n++;
+  });
+  return n;
+}
 export function groupDevicesByAgent(devices) {
   const groups = {};
   devices.forEach((dv) => {

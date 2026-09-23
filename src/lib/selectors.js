@@ -1,5 +1,5 @@
 "use strict";
-import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, submissionTotals, todayStr } from "./domain.js";
+import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, submissionTotals, todayStr } from "./domain.js";
 import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
@@ -74,9 +74,12 @@ export function overviewStats(data, scope) {
   });
   const ledgerDepots = ledgerDepotsForScope(data.depots, scope);
   let ledgerCounts = { total: 0, fresh: 0, projected: 0, aged: 0, urgent: 0, highrisk: 0, reallocated: 0, returned: 0 };
+  let aged10Plus = 0;
   ledgerDepots.forEach((d) => {
-    const c = countsForDevices(ledgerDevices(data.deviceLedger, d.code));
+    const devices = ledgerDevices(data.deviceLedger, d.code);
+    const c = countsForDevices(devices);
     Object.keys(ledgerCounts).forEach((k) => { ledgerCounts[k] += c[k]; });
+    aged10Plus += countsAtDayThreshold(devices, 10);
   });
   const today = todayStr();
   let submittedToday = 0;
@@ -92,7 +95,7 @@ export function overviewStats(data, scope) {
   return {
     activeDepots: active.length, totalDepots: depots.length,
     scFilled: filled.length, scVacant: active.length - filled.length,
-    deviceTotal, ledgerCounts, warehousePendingCounts,
+    deviceTotal, ledgerCounts, aged10Plus, warehousePendingCounts,
     submittedToday, expectedSubmissions: active.length,
   };
 }
