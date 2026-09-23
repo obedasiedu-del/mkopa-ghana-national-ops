@@ -17,6 +17,7 @@ const DEPOT_TABS = [
   { id: "submission", label: "Daily Submission" },
   { id: "movement", label: "Stock Movement" },
   { id: "aging", label: "Stock Aging" },
+  { id: "warehouse", label: "Warehouse Stock" },
   { id: "audit", label: "Audit History" },
 ];
 
@@ -55,6 +56,7 @@ export function DepotPage() {
       tab === "submission" && React.createElement(SubmissionTab, { rec, canWrite }),
       tab === "movement" && React.createElement(MovementTab, { rec, canWrite }),
       tab === "aging" && React.createElement(AgingTab, { rec }),
+      tab === "warehouse" && React.createElement(WarehouseTab, { rec }),
       tab === "audit" && React.createElement(AuditTab, { rec })));
 }
 
@@ -242,6 +244,41 @@ const AGING_COLUMNS = [
   { key: "model", label: "Product", sortable: true, render: (dv) => dv.model || "—" },
   { key: "dsrName", label: "DSR", sortable: true, render: (dv) => dv.dsrName || "—" },
   { key: "allocatedDate", label: "In Channel Since", sortable: true, sortValue: (dv) => agingDate(dv), render: (dv) => fmtDateShort(agingDate(dv)) },
+  { key: "days", label: "Days", numeric: true, sortable: true, sortValue: (dv) => daysAllocated(agingDate(dv)), render: (dv) => daysAllocated(agingDate(dv)) },
+];
+
+/* ============ Warehouse Stock ============ */
+// Same tier breakdown as Stock Aging (FIFO days since the export's own "date current state
+// attained"), but for devices earmarked for this depot that are still physically sitting in
+// a warehouse -- see the "In Warehouse (Pending)" KPI and the Upload Warehouse Stock import.
+function WarehouseTab({ rec }) {
+  const { data } = useApp();
+  const devices = ledgerDevices(data.warehousePending, rec.code);
+  const groups = groupDevicesByTier(devices);
+  const [activeTier, setActiveTier] = React.useState(null);
+  const shown = activeTier ? groups[activeTier] : [];
+  return React.createElement(React.Fragment, null,
+    React.createElement("div", { style: { fontSize: 12.8, color: "var(--text-muted)", marginBottom: 14 } }, "Devices allocated to this depot but not yet physically here — still sitting in a warehouse. How long each one has been waiting, from the last warehouse-stock upload."),
+    devices.length === 0 && React.createElement("div", { className: "table-wrap" }, React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No warehouse-pending devices on file for this depot.")),
+    devices.length > 0 && React.createElement(React.Fragment, null,
+      React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
+        LEDGER_TIERS.map((t) => React.createElement("button", { key: t.key, className: "kpi-tile", style: { textAlign: "left", cursor: "pointer", outline: activeTier === t.key ? "2px solid var(--accent, #2a78d6)" : "none" }, onClick: () => setActiveTier((a) => (a === t.key ? null : t.key)) },
+          React.createElement("div", { className: "kpi-label" }, t.label),
+          React.createElement("div", { className: "kpi-value" }, fmtNum(groups[t.key].length)),
+          React.createElement("div", { className: "kpi-foot" }, t.min === undefined ? "0–" + t.max + " days" : t.max === undefined ? t.min + "+ days" : t.min + "–" + t.max + " days")))),
+      activeTier && React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "drawer-section-title" }, LEDGER_TIERS.find((t) => t.key === activeTier).label, " devices"),
+        React.createElement(DataTable, {
+          columns: WAREHOUSE_COLUMNS, rows: shown, rowKey: (dv) => dv.serial, defaultSortKey: "allocatedDate",
+          emptyMessage: "No devices in this tier.",
+        })),
+      !activeTier && React.createElement("div", { style: { fontSize: 12.5, color: "var(--text-faint)" } }, "Click a tier above to see its devices.")));
+}
+const WAREHOUSE_COLUMNS = [
+  { key: "serial", label: "Serial", sortable: true, render: (dv) => React.createElement("span", { className: "mono" }, dv.serial) },
+  { key: "model", label: "Product", sortable: true, render: (dv) => dv.model || "—" },
+  { key: "shopName", label: "Owner (as on file)", sortable: true, render: (dv) => dv.shopName || "—" },
+  { key: "allocatedDate", label: "In Warehouse Since", sortable: true, sortValue: (dv) => agingDate(dv), render: (dv) => fmtDateShort(agingDate(dv)) },
   { key: "days", label: "Days", numeric: true, sortable: true, sortValue: (dv) => daysAllocated(agingDate(dv)), render: (dv) => daysAllocated(agingDate(dv)) },
 ];
 

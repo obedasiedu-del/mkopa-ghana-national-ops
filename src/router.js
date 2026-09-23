@@ -9,7 +9,7 @@ import React from "react";
 //   #/                              national overview
 //   #/region/:region                region overview
 //   #/depot/:code                   depot overview (defaults to the "devices" tab)
-//   #/depot/:code/:tab              depot page, one of: devices | submission | movement | aging | audit
+//   #/depot/:code/:tab              depot page, one of: devices | submission | movement | aging | warehouse | audit
 //   #/movements?region=X            Stock Movement log, national (no region) or one region, filterable
 //   #/audit?region=X                Audit History log, national (no region) or one region, filterable
 //   #/halts?region=X                Allocation Halt Status report, national (no region) or one region
