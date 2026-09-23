@@ -5,6 +5,33 @@ import { Modal } from "../components/ui.js";
 import { depotsForScope } from "../lib/selectors.js";
 import { SUBMISSION_MODELS, todayStr, fmtDateShort, submissionTotals, agedPctColor, downloadCsv } from "../lib/domain.js";
 
+// A tab you switch away from (or a laptop that sleeps and drops the connection long enough
+// to force a session refresh) can lose whatever's only sitting in this modal's React state --
+// there's no autosave otherwise, so an interrupted, not-yet-submitted entry would just vanish.
+// Saving a draft to localStorage as you type protects against that: it survives a reload or a
+// remount, is scoped to this browser only, and gets cleared the moment the real submit lands.
+function draftKey(depotCode, date) {
+  return "mkopa-submission-draft:" + depotCode + ":" + date;
+}
+function loadDraft(depotCode, date) {
+  try {
+    const raw = localStorage.getItem(draftKey(depotCode, date));
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+function saveDraft(depotCode, date, draft) {
+  try {
+    localStorage.setItem(draftKey(depotCode, date), JSON.stringify(draft));
+  } catch (e) { /* private mode / storage full -- editing still works, just unsaved */ }
+}
+function clearDraft(depotCode, date) {
+  try {
+    localStorage.removeItem(draftKey(depotCode, date));
+  } catch (e) { /* nothing to clean up if this fails */ }
+}
+
 export function SubmissionModal({ depotCode: initialCode }) {
   const { data, closeModal, runAction, toast } = useApp();
   const depotOptions = React.useMemo(() => depotsForScope(data.depots, "national").filter((d) => d.status === "active"), [data.depots]);
@@ -12,19 +39,35 @@ export function SubmissionModal({ depotCode: initialCode }) {
   const [depotCode, setDepotCode] = React.useState(defaultCode);
   const today = todayStr();
   const todayEntry = (data.submissionsByDepot[depotCode] || []).find((d) => d.date === today) || null;
-  const [name, setName] = React.useState(todayEntry ? todayEntry.submittedBy : "");
+  const initialDraft = React.useMemo(() => loadDraft(defaultCode, today), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [restoredDraft, setRestoredDraft] = React.useState(!!initialDraft);
+  const [name, setName] = React.useState(initialDraft ? initialDraft.name : (todayEntry ? todayEntry.submittedBy : ""));
   const [totals, setTotals] = React.useState(() => {
+    if (initialDraft) return initialDraft.totals;
     const o = {};
     SUBMISSION_MODELS.forEach((m) => { o[m] = (todayEntry && todayEntry.models[m]) ? todayEntry.models[m].totalStock : 0; });
     return o;
   });
   const [ageds, setAgeds] = React.useState(() => {
+    if (initialDraft) return initialDraft.ageds;
     const o = {};
     SUBMISSION_MODELS.forEach((m) => { o[m] = (todayEntry && todayEntry.models[m]) ? todayEntry.models[m].agedStock : 0; });
     return o;
   });
+  // Skip the draft-save effect's first run for a freshly opened depot -- otherwise it would
+  // immediately re-save the exact draft/entry state was just seeded from.
+  const skipNextSaveRef = React.useRef(true);
+  React.useEffect(() => {
+    if (skipNextSaveRef.current) { skipNextSaveRef.current = false; return; }
+    saveDraft(depotCode, today, { name, totals, ageds });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [depotCode, name, totals, ageds]);
   function onDepotChange(code) {
     setDepotCode(code);
+    skipNextSaveRef.current = true;
+    const draft = loadDraft(code, today);
+    setRestoredDraft(!!draft);
+    if (draft) { setName(draft.name); setTotals(draft.totals); setAgeds(draft.ageds); return; }
     const entry = (data.submissionsByDepot[code] || []).find((d) => d.date === today) || null;
     setName(entry ? entry.submittedBy : "");
     const t = {}, a = {};
@@ -44,7 +87,10 @@ export function SubmissionModal({ depotCode: initialCode }) {
       }
       modelsObj[m] = { totalStock, agedStock };
     }
-    runAction(() => data.saveSubmission(depotCode, today, name, modelsObj), "Submission saved").then(closeModal);
+    runAction(() => data.saveSubmission(depotCode, today, name, modelsObj), "Submission saved").then(() => {
+      clearDraft(depotCode, today);
+      closeModal();
+    });
   }
   function exportHistory() {
     const days = (data.submissionsByDepot[depotCode] || []).slice().reverse();
@@ -66,6 +112,9 @@ export function SubmissionModal({ depotCode: initialCode }) {
     React.createElement("button", { className: "btn btn-primary", onClick: submit }, "Submit")) },
     React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-muted)", marginTop: -6, marginBottom: 10 } },
       "Collects daily stock updates from each depot. For ", fmtDateShort(today), todayEntry ? " (editing today's entry)" : "", "."),
+    restoredDraft && React.createElement("div", { className: "banner", style: { marginBottom: 10 } },
+      React.createElement("span", null, "↺"),
+      React.createElement("div", null, "Restored what you typed before you left this window — nothing was lost. Click Submit when you're ready.")),
     React.createElement("div", { className: "field-row" },
       React.createElement("div", { className: "field-label" }, "Depot"),
       React.createElement("select", { className: "field-input", value: depotCode, onChange: (e) => onDepotChange(e.target.value) },
