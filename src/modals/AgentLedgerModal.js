@@ -33,5 +33,6 @@ export function AgentLedgerModal({ group, scope = "national" }) {
               React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } },
                 dv.status !== "reallocated" && React.createElement("button", { className: "btn btn-sm", onClick: () => runAction(() => data.updateDeviceStatus(dv.depotCode, dv.serial, "reallocated", setBy || "—"), "Device marked reallocated") }, "Mark Reallocated"),
                 dv.status !== "returned" && React.createElement("button", { className: "btn btn-sm", onClick: () => runAction(() => data.updateDeviceStatus(dv.depotCode, dv.serial, "returned", setBy || "—"), "Device marked returned") }, "Mark Returned"),
+                dv.status !== "sold" && React.createElement("button", { className: "btn btn-sm", onClick: () => runAction(() => data.updateDeviceStatus(dv.depotCode, dv.serial, "sold", setBy || "—"), "Device marked sold") }, "Mark Sold"),
                 dv.status !== "in_stock" && React.createElement("button", { className: "btn btn-sm", onClick: () => runAction(() => data.updateDeviceStatus(dv.depotCode, dv.serial, "in_stock", setBy || "—"), "Device reinstated") }, "Reinstate")))))))));
 }

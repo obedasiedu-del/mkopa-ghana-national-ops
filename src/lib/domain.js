@@ -111,21 +111,21 @@ export function ledgerTierFor(days) {
 export function agingDate(dv) {
   return dv.initialAllocatedDate || dv.allocatedDate;
 }
+// Reallocated, Returned, and Sold devices are all netted out of the aging tiers entirely
+// (matching the Central Region policy's "Net Aged = Aged − Sold − Returned") rather than
+// left sitting in whatever tier their stale age lands in -- none of the three is still
+// meaningfully "aging stock", so none should be able to push a depot over its halt-policy
+// limit. Shared by every function below that walks a device list for aging purposes.
+export function isResolvedStatus(status) {
+  return status === "reallocated" || status === "returned" || status === "sold";
+}
 // devices: array of {status, allocatedDate, initialAllocatedDate}
 export function countsForDevices(devices) {
-  const counts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0 };
+  const counts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
   devices.forEach((dv) => {
     counts.total++;
-    if (dv.status === "reallocated") {
-      counts.reallocated++;
-      return;
-    }
-    // A returned device is netted out of the aging tiers entirely (matching the Central
-    // Region policy's "Net Aged = Aged − Sold − Returned") rather than left sitting in
-    // whatever tier its stale age lands in -- it's no longer aging stock in any meaningful
-    // sense, so it shouldn't be able to push a depot over its halt-policy limit.
-    if (dv.status === "returned") {
-      counts.returned++;
+    if (isResolvedStatus(dv.status)) {
+      counts[dv.status]++;
       return;
     }
     const tier = ledgerTierFor(daysAllocated(agingDate(dv)));
@@ -136,16 +136,30 @@ export function countsForDevices(devices) {
 // Counts devices at or past an exact day threshold, independent of the fixed
 // Fresh/Aged/14+ tier boundaries above (those stay as they are -- the Halt Policy phases are
 // built on the 14-day "urgent" boundary specifically, so they aren't touched here). Used for
-// the Stock Aging KPI's own thresholds. Reallocated/returned devices are excluded the same
-// way countsForDevices excludes them from its tiers.
+// the Stock Aging KPI's own thresholds. Resolved devices are excluded the same way
+// countsForDevices excludes them from its tiers.
 export function countsAtDayThreshold(devices, threshold) {
   let n = 0;
   devices.forEach((dv) => {
-    if (dv.status === "reallocated" || dv.status === "returned") return;
+    if (isResolvedStatus(dv.status)) return;
     const days = daysAllocated(agingDate(dv));
     if (days !== null && days >= threshold) n++;
   });
   return n;
+}
+// For a halted (or any) depot's device list: aged 14+ devices (the same netted count the
+// Halt Policy itself uses) grouped by model/SKU, sorted by count descending -- lets you see
+// which specific product is actually driving a depot's halt, per Central Region's approach.
+export function agedSkuBreakdown(devices, threshold = 14) {
+  const counts = {};
+  devices.forEach((dv) => {
+    if (isResolvedStatus(dv.status)) return;
+    const days = daysAllocated(agingDate(dv));
+    if (days === null || days < threshold) return;
+    const sku = dv.model || "(unknown model)";
+    counts[sku] = (counts[sku] || 0) + 1;
+  });
+  return Object.entries(counts).map(([model, count]) => ({ model, count })).sort((a, b) => b.count - a.count);
 }
 export function groupDevicesByAgent(devices) {
   const groups = {};
@@ -168,7 +182,7 @@ export function groupDevicesByTier(devices) {
   const groups = {};
   LEDGER_TIERS.forEach((t) => { groups[t.key] = []; });
   devices.forEach((dv) => {
-    if (dv.status === "reallocated" || dv.status === "returned") return;
+    if (isResolvedStatus(dv.status)) return;
     const tier = ledgerTierFor(daysAllocated(agingDate(dv)));
     if (tier) groups[tier.key].push(dv);
   });

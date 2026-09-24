@@ -3,12 +3,13 @@ import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { Modal, LedgerAgingBadge } from "../components/ui.js";
 import { depotsForScope, ledgerDevices, PSEUDO_DEPOTS } from "../lib/selectors.js";
-import { countsForDevices, parsePastedDevices, daysAllocated, agingDate, ledgerTierFor, fmtDateShort, downloadCsv } from "../lib/domain.js";
+import { countsForDevices, parsePastedDevices, daysAllocated, agingDate, ledgerTierFor, isResolvedStatus, fmtDateShort, downloadCsv } from "../lib/domain.js";
 
 const LEDGER_MODAL_CHIP_DEFS = [
   { key: "all", label: "All" }, { key: "fresh", label: "Fresh" },
   { key: "aged", label: "Aged" }, { key: "urgent", label: "14+ Days" },
   { key: "reallocated", label: "Reallocated" }, { key: "returned", label: "Returned" },
+  { key: "sold", label: "Sold" },
 ];
 export function LedgerModal({ depotCode: initialCode }) {
   const { data, closeModal, toast, runAction } = useApp();
@@ -38,13 +39,14 @@ export function LedgerModal({ depotCode: initialCode }) {
     if (filter === "all") return true;
     if (filter === "reallocated") return dv.status === "reallocated";
     if (filter === "returned") return dv.status === "returned";
-    return dv.status !== "reallocated" && tier && tier.key === filter;
+    if (filter === "sold") return dv.status === "sold";
+    return !isResolvedStatus(dv.status) && tier && tier.key === filter;
   }
   const q = search.trim().toLowerCase();
   const rows = [...devices]
     .sort((a, b) => (daysAllocated(agingDate(b)) || 0) - (daysAllocated(agingDate(a)) || 0))
     .filter((dv) => {
-      const tier = dv.status === "reallocated" ? null : ledgerTierFor(daysAllocated(agingDate(dv)));
+      const tier = isResolvedStatus(dv.status) ? null : ledgerTierFor(daysAllocated(agingDate(dv)));
       if (!matchesFilter(dv, tier)) return false;
       if (q && !(dv.serial || "").toLowerCase().includes(q) && !(dv.dsrName || "").toLowerCase().includes(q)) return false;
       return true;
@@ -53,8 +55,8 @@ export function LedgerModal({ depotCode: initialCode }) {
     const out = [["Serial Number", "Product", "Shop Name", "DSR Name", "In Channel Since", "Days", "Aging Tier", "Status"]];
     devices.forEach((dv) => {
       const days = daysAllocated(agingDate(dv));
-      const tier = dv.status === "reallocated" ? null : ledgerTierFor(days);
-      out.push([dv.serial, dv.model, dv.shopName || "", dv.dsrName, agingDate(dv), days === null ? "" : days, tier ? tier.label : (dv.status === "reallocated" ? "" : "—"), dv.status]);
+      const tier = isResolvedStatus(dv.status) ? null : ledgerTierFor(days);
+      out.push([dv.serial, dv.model, dv.shopName || "", dv.dsrName, agingDate(dv), days === null ? "" : days, tier ? tier.label : (isResolvedStatus(dv.status) ? "" : "—"), dv.status]);
     });
     downloadCsv(depotCode + "-device-allocation-analysis.csv", out);
   }
@@ -70,6 +72,7 @@ export function LedgerModal({ depotCode: initialCode }) {
       ["Aged (10–13d)", counts.aged, "var(--critical)"], ["14+ Days", counts.urgent, "var(--urgent)"],
       ["Reallocated", counts.reallocated, "var(--text-muted)"],
       ["Returned", counts.returned, "var(--text-muted)"],
+      ["Sold", counts.sold, "var(--success)"],
     ].map((row) => React.createElement("div", { key: row[0] },
       React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--text-muted)" } }, row[0]),
       React.createElement("div", { className: "mono", style: { fontSize: 15, fontWeight: 600, color: row[2] } }, row[1])))),
@@ -82,7 +85,7 @@ export function LedgerModal({ depotCode: initialCode }) {
       React.createElement("input", { className: "field-input", value: setBy, onChange: (e) => setSetBy(e.target.value) })),
     React.createElement("div", { style: { marginBottom: 16 } },
       React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveBaseline }, "Save Baseline")),
-    React.createElement("div", { className: "drawer-section-title" }, "Devices — search or mark Reallocated / Returned"),
+    React.createElement("div", { className: "drawer-section-title" }, "Devices — search or mark Reallocated / Returned / Sold"),
     React.createElement("div", { className: "field-row" },
       React.createElement("input", { className: "field-input", placeholder: "Search serial number or DSR name", value: search, onChange: (e) => setSearch(e.target.value) })),
     React.createElement("div", { style: { display: "flex", gap: 6, flexWrap: "wrap", margin: "8px 0 10px" } },
@@ -105,6 +108,7 @@ export function LedgerModal({ depotCode: initialCode }) {
               React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } },
                 dv.status !== "reallocated" && React.createElement("button", { className: "btn btn-sm", onClick: () => runAction(() => data.updateDeviceStatus(depotCode, dv.serial, "reallocated", setBy || "—"), "Device marked reallocated") }, "Mark Reallocated"),
                 dv.status !== "returned" && React.createElement("button", { className: "btn btn-sm", onClick: () => runAction(() => data.updateDeviceStatus(depotCode, dv.serial, "returned", setBy || "—"), "Device marked returned") }, "Mark Returned"),
+                dv.status !== "sold" && React.createElement("button", { className: "btn btn-sm", onClick: () => runAction(() => data.updateDeviceStatus(depotCode, dv.serial, "sold", setBy || "—"), "Device marked sold") }, "Mark Sold"),
                 dv.status !== "in_stock" && React.createElement("button", { className: "btn btn-sm", onClick: () => runAction(() => data.updateDeviceStatus(depotCode, dv.serial, "in_stock", setBy || "—"), "Device reinstated") }, "Reinstate")))))))),
     React.createElement("div", { style: { marginTop: 10 } },
       React.createElement("button", { className: "btn btn-ghost btn-sm", onClick: exportDepotCsv }, "📥 Export this depot (CSV)")));

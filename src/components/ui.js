@@ -71,6 +71,8 @@ export function Breadcrumb({ items }) {
 }
 export function LedgerAgingBadge({ device }) {
   if (device.status === "reallocated") return React.createElement(Pill, { cls: "pill-muted" }, "Reallocated");
+  if (device.status === "returned") return React.createElement(Pill, { cls: "pill-muted" }, "Returned");
+  if (device.status === "sold") return React.createElement(Pill, { cls: "pill-success" }, "Sold");
   const days = daysAllocated(agingDate(device));
   const tier = ledgerTierFor(days);
   if (!tier) return React.createElement("span", { style: { color: "var(--text-faint)" } }, "—");

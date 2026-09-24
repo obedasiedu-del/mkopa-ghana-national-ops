@@ -73,7 +73,7 @@ export function overviewStats(data, scope) {
     deviceTotal += latest ? submissionTotals(latest).totalStock : 0;
   });
   const ledgerDepots = ledgerDepotsForScope(data.depots, scope);
-  let ledgerCounts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0 };
+  let ledgerCounts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
   let aged10Plus = 0;
   ledgerDepots.forEach((d) => {
     const devices = ledgerDevices(data.deviceLedger, d.code);
@@ -87,7 +87,7 @@ export function overviewStats(data, scope) {
     const days = data.submissionsByDepot[d.code] || [];
     if (days.some((s) => s.date === today)) submittedToday++;
   });
-  let warehousePendingCounts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0 };
+  let warehousePendingCounts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
   depots.forEach((d) => {
     const c = countsForDevices(data.warehousePending[d.code] || []);
     Object.keys(warehousePendingCounts).forEach((k) => { warehousePendingCounts[k] += c[k]; });
