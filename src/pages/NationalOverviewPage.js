@@ -6,7 +6,7 @@ import { KpiTile, EmptyRow } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { REGION_ORDER, fmtNum, groupDevicesByAgent, countsForDevices } from "../lib/domain.js";
-import { overviewStats, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope } from "../lib/selectors.js";
+import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
 function RegionCard({ region }) {
@@ -40,6 +40,16 @@ function AgentsByDsrTable() {
             React.createElement("td", { className: "num", style: { fontWeight: 600 } }, c.total),
             React.createElement("td", { className: "num" }, c.urgent));
         }))));
+}
+
+function IndirectChannelCard() {
+  const { data, goDepot } = useApp();
+  const counts = countsForDevices(ledgerDevices(data.deviceLedger, "INDIRECT"));
+  return React.createElement("button", { className: "territory-card", onClick: () => goDepot("INDIRECT") },
+    React.createElement("div", { className: "territory-name" }, "Indirect Channel", React.createElement("span", { className: "arrow" }, "→")),
+    React.createElement("div", { className: "territory-stats" },
+      React.createElement("div", null, React.createElement("div", { className: "territory-stat-num" }, fmtNum(counts.total)), React.createElement("div", { className: "territory-stat-label" }, "Devices")),
+      React.createElement("div", null, React.createElement("div", { className: "territory-stat-num" }, fmtNum(counts.urgent)), React.createElement("div", { className: "territory-stat-label" }, "Aged 14+d"))));
 }
 
 export function NationalOverviewPage() {
@@ -111,6 +121,8 @@ export function NationalOverviewPage() {
         React.createElement("button", { className: view === "map" ? "active" : "", onClick: () => setView("map") }, "Map"),
         React.createElement("button", { className: view === "cards" ? "active" : "", onClick: () => setView("cards") }, "Cards"))),
     view === "map" ? React.createElement(GhanaMap, null) : React.createElement("div", { className: "territory-grid" }, REGION_ORDER.map((r) => React.createElement(RegionCard, { key: r, region: r }))),
+    React.createElement("div", { className: "section-heading", style: { marginTop: 18 } }, "Other Channels"),
+    React.createElement("div", { className: "territory-grid", style: { marginBottom: 22 } }, React.createElement(IndirectChannelCard, null)),
     canBulkEdit && React.createElement(React.Fragment, null,
       React.createElement("div", { className: "section-heading-row" },
         React.createElement("div", { className: "section-heading" }, "Bulk device data entry"),

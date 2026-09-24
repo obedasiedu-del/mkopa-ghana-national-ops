@@ -38,11 +38,16 @@ export function DepotPage() {
 
   return React.createElement("div", { className: "content" },
     React.createElement(Breadcrumb, {
-      items: [
-        { label: "National", onClick: goNational },
-        { label: rec.region, onClick: () => goRegion(rec.region) },
-        { label: rec.name },
-      ],
+      // A synthetic bucket (Indirect Channel, Warehouse, etc.) isn't tied to any real
+      // region -- its "region" is just the literal string "National" -- so a middle crumb
+      // for it would link to a region page that doesn't exist.
+      items: rec.isSynthetic
+        ? [{ label: "National", onClick: goNational }, { label: rec.name }]
+        : [
+            { label: "National", onClick: goNational },
+            { label: rec.region, onClick: () => goRegion(rec.region) },
+            { label: rec.name },
+          ],
     }),
     React.createElement("div", { className: "topbar-row", style: { marginBottom: 4 } },
       React.createElement("div", null,
