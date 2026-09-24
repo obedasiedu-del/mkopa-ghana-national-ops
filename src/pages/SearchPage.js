@@ -2,10 +2,11 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { EmptyRow, LedgerAgingBadge } from "../components/ui.js";
-import { ledgerDevicesForScope, depotsForScope } from "../lib/selectors.js";
+import { ledgerDevicesForScope, depotsForScope, depotRecordForLedger } from "../lib/selectors.js";
+import { canWriteDepot } from "../data/useAuth.js";
 
 export function SearchPage() {
-  const { data, route, goDepot } = useApp();
+  const { data, auth, route, goDepot, runAction } = useApp();
   const q = (route.query.q || "").trim().toLowerCase();
 
   const depotMatches = q ? depotsForScope(data.depots, "national").filter((d) =>
@@ -19,6 +20,11 @@ export function SearchPage() {
     dsrSet.add(name);
     return true;
   }).slice(0, 50) : [];
+
+  const setBy = (auth.user && auth.user.email) || "—";
+  function setStatus(dv, newStatus, msg) {
+    runAction(() => data.updateDeviceStatus(dv.depotCode, dv.serial, newStatus, setBy), msg);
+  }
 
   return React.createElement("div", { className: "content" },
     React.createElement("div", { className: "scope-title" }, "Search results"),
@@ -37,14 +43,24 @@ export function SearchPage() {
       React.createElement("div", { className: "section-heading" }, "Devices by serial (", deviceMatches.length, ")"),
       React.createElement("div", { className: "table-wrap", style: { marginBottom: 20 } },
         React.createElement("table", null,
-          React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Serial"), React.createElement("th", null, "Depot"), React.createElement("th", null, "DSR"), React.createElement("th", null, "Aging / Status"))),
+          React.createElement("thead", null, React.createElement("tr", null, React.createElement("th", null, "Serial"), React.createElement("th", null, "Depot"), React.createElement("th", null, "DSR"), React.createElement("th", null, "Aging / Status"), React.createElement("th", null, "Actions"))),
           React.createElement("tbody", null,
-            deviceMatches.length === 0 && React.createElement(EmptyRow, { colSpan: 4 }, "No devices match."),
-            deviceMatches.map((dv) => React.createElement("tr", { key: dv.depotCode + dv.serial, className: "clickable", onClick: () => goDepot(dv.depotCode, "devices") },
-              React.createElement("td", { className: "mono" }, dv.serial),
-              React.createElement("td", null, dv.depotName || dv.depotCode),
-              React.createElement("td", null, dv.dsrName || "—"),
-              React.createElement("td", null, React.createElement(LedgerAgingBadge, { device: dv }))))))),
+            deviceMatches.length === 0 && React.createElement(EmptyRow, { colSpan: 5 }, "No devices match."),
+            deviceMatches.map((dv) => {
+              const depotRegion = depotRecordForLedger(data.depots, dv.depotCode)?.region;
+              const canWrite = canWriteDepot(auth.role, dv.depotCode, depotRegion);
+              return React.createElement("tr", { key: dv.depotCode + dv.serial },
+                React.createElement("td", { className: "mono clickable", onClick: () => goDepot(dv.depotCode, "devices") }, dv.serial),
+                React.createElement("td", { className: "clickable", onClick: () => goDepot(dv.depotCode, "devices") }, dv.depotName || dv.depotCode),
+                React.createElement("td", null, dv.dsrName || "—"),
+                React.createElement("td", null, React.createElement(LedgerAgingBadge, { device: dv })),
+                React.createElement("td", null,
+                  canWrite && React.createElement("div", { style: { display: "flex", gap: 4, flexWrap: "wrap" } },
+                    dv.status !== "reallocated" && React.createElement("button", { className: "btn btn-sm", onClick: () => setStatus(dv, "reallocated", "Device marked reallocated") }, "Reallocated"),
+                    dv.status !== "returned" && React.createElement("button", { className: "btn btn-sm", onClick: () => setStatus(dv, "returned", "Device marked returned") }, "Returned"),
+                    dv.status !== "sold" && React.createElement("button", { className: "btn btn-sm", onClick: () => setStatus(dv, "sold", "Device marked sold") }, "Sold"),
+                    dv.status !== "in_stock" && React.createElement("button", { className: "btn btn-sm", onClick: () => setStatus(dv, "in_stock", "Device reinstated") }, "Reinstate"))));
+            })))),
       React.createElement("div", { className: "section-heading" }, "DSRs (", dsrMatches.length, ")"),
       React.createElement("div", { className: "table-wrap" },
         React.createElement("table", null,
