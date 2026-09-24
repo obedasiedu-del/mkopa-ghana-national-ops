@@ -120,20 +120,28 @@ export function countsForDevices(devices) {
       counts.reallocated++;
       return;
     }
-    if (dv.status === "returned") counts.returned++;
+    // A returned device is netted out of the aging tiers entirely (matching the Central
+    // Region policy's "Net Aged = Aged − Sold − Returned") rather than left sitting in
+    // whatever tier its stale age lands in -- it's no longer aging stock in any meaningful
+    // sense, so it shouldn't be able to push a depot over its halt-policy limit.
+    if (dv.status === "returned") {
+      counts.returned++;
+      return;
+    }
     const tier = ledgerTierFor(daysAllocated(agingDate(dv)));
     if (tier) counts[tier.key]++;
   });
   return counts;
 }
 // Counts devices at or past an exact day threshold, independent of the fixed
-// Fresh/Projected/Aged/Urgent/High Risk tier boundaries above (those stay as they are --
-// the Halt Policy phases are built on the 14-day "Urgent + High Risk" boundary specifically,
-// so they aren't touched here). Used for the Stock Aging KPI's own thresholds.
+// Fresh/Aged/14+ tier boundaries above (those stay as they are -- the Halt Policy phases are
+// built on the 14-day "urgent" boundary specifically, so they aren't touched here). Used for
+// the Stock Aging KPI's own thresholds. Reallocated/returned devices are excluded the same
+// way countsForDevices excludes them from its tiers.
 export function countsAtDayThreshold(devices, threshold) {
   let n = 0;
   devices.forEach((dv) => {
-    if (dv.status === "reallocated") return;
+    if (dv.status === "reallocated" || dv.status === "returned") return;
     const days = daysAllocated(agingDate(dv));
     if (days !== null && days >= threshold) n++;
   });
