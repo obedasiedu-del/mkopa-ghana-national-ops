@@ -135,19 +135,23 @@ export function useAppData() {
     setWarehousePending(map);
   }, []);
 
-  // Not every rejection is a plain Error with a .message -- a Postgrest error object with
-  // an empty message, or something that isn't an Error at all, stringifies to the useless
-  // "[object Object]" via template interpolation. Fall back to the object's own fields
-  // (JSON.stringify) before giving up, so the banner always shows something diagnosable.
+  // Not every rejection is a plain Error with a useful .message -- a Postgrest error object
+  // can carry code/details/hint instead (or as well), and an object like {message: ""} with
+  // nothing else is what a dropped fetch() looks like once supabase-js wraps it (no server
+  // response ever came back, so there's no code/details/hint to report). Pull every field
+  // that might hold real information, and only fall back to a plain-English explanation once
+  // none of them do -- never show a blank string or "{}" in the banner.
   function describeError(e) {
     if (!e) return "Unknown error";
     if (typeof e === "string") return e;
-    if (e.message) return e.message + (e.code ? ` (code ${e.code})` : "");
-    try {
-      const s = JSON.stringify(e);
-      if (s && s !== "{}") return s;
-    } catch (_jsonErr) { /* fall through */ }
-    return String(e);
+    const parts = [];
+    if (e.message) parts.push(String(e.message));
+    if (e.code) parts.push("code " + e.code);
+    if (e.details) parts.push(String(e.details));
+    if (e.hint) parts.push(String(e.hint));
+    if (e.status || e.statusCode) parts.push("HTTP " + (e.status || e.statusCode));
+    if (parts.length) return parts.join(" — ");
+    return "The request to the server got no response (likely a dropped network connection).";
   }
   // Tags a refresh failure with which table it came from -- Supabase/fetch errors don't
   // self-identify the source, and without this every failure collapses into the same
