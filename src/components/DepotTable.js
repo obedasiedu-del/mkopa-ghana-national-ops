@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { ScStatusPill, ScoreCell } from "./ui.js";
 import { DataTable } from "./DataTable.js";
 import { ledgerDevices, latestSubmissionForDepot } from "../lib/selectors.js";
-import { countsForDevices, submissionTotals, fmtNum, trueAgePct } from "../lib/domain.js";
+import { countsForDevices, submissionTotals, fmtNum, trueAgePct, psdsrPct } from "../lib/domain.js";
 
 // Region-level view of the same per-depot device/aging figures the depot page itself shows
 // (Devices at Depot from the daily submission, 14+ Days from the device ledger) -- without
@@ -36,6 +36,10 @@ const COLUMNS = [
     key: "trueAge", label: "True Age", sortable: true, numeric: true,
     sortValue: (d) => d._trueAge ?? -1, render: (d) => (d._trueAge === null ? "—" : d._trueAge + "%"),
   },
+  {
+    key: "psdsr", label: "PSDSR", sortable: true, numeric: true,
+    sortValue: (d) => d._psdsr ?? -1, render: (d) => (d._psdsr === null ? "—" : d._psdsr + "%"),
+  },
 ];
 
 export function DepotTable({ depots }) {
@@ -44,8 +48,11 @@ export function DepotTable({ depots }) {
   const enriched = React.useMemo(() => depots.map((d) => {
     const latest = latestSubmissionForDepot(data.submissionsByDepot, d.code);
     const ledgerCounts = countsForDevices(ledgerDevices(data.deviceLedger, d.code));
-    return { ...d, _devicesAtDepot: latest ? submissionTotals(latest).totalStock : null, _aged14: ledgerCounts.urgent, _trueAge: trueAgePct(ledgerCounts) };
-  }), [depots, data.submissionsByDepot, data.deviceLedger]);
+    return {
+      ...d, _devicesAtDepot: latest ? submissionTotals(latest).totalStock : null, _aged14: ledgerCounts.urgent,
+      _trueAge: trueAgePct(ledgerCounts), _psdsr: psdsrPct(data.psdsrByDepot[d.code]),
+    };
+  }), [depots, data.submissionsByDepot, data.deviceLedger, data.psdsrByDepot]);
   const filtered = enriched.filter((d) => !q || (d.name + " " + d.code + " " + d.scName).toLowerCase().includes(q));
   return React.createElement(DataTable, {
     columns: COLUMNS, rows: filtered, rowKey: (d) => d.code, onRowClick: (d) => goDepot(d.code),

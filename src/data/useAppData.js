@@ -61,6 +61,7 @@ export function useAppData() {
   const [ledgerBaseline, setLedgerBaseline] = React.useState({});
   const [deviceLedger, setDeviceLedger] = React.useState({});
   const [warehousePending, setWarehousePending] = React.useState({});
+  const [psdsrByDepot, setPsdsrByDepot] = React.useState({});
   const [loaded, setLoaded] = React.useState(false);
   const [dbError, setDbError] = React.useState(null);
 
@@ -118,6 +119,16 @@ export function useAppData() {
     });
     setDeviceLedger(map);
   }, []);
+  // Latest weekly PSDSR entry per depot (period_date ascending, so later rows overwrite
+  // earlier ones -- the map ends up holding just the most recent week per depot).
+  const refreshPsdsr = React.useCallback(async () => {
+    const rows = await fetchAll("psdsr_weekly", "period_date");
+    const map = {};
+    rows.forEach((r) => {
+      map[r.depot_code] = { total: r.total_pdsr, sufficient: r.sufficient_stocks, periodDate: r.period_date, enteredBy: r.entered_by || "" };
+    });
+    setPsdsrByDepot(map);
+  }, []);
   // Warehouse-held stock that's earmarked for a depot but not physically there yet (still
   // sitting in a warehouse, per the source tracker's own "Warehouse Stock" state) -- kept
   // separate from device_ledger/stockBalances so it's never mistaken for on-hand stock.
@@ -164,11 +175,11 @@ export function useAppData() {
     const tasks = [
       tagSource("depots", refreshDepots), tagSource("stock balances", refreshStockBalances),
       tagSource("submissions", refreshSubmissions), tagSource("ledger baseline", refreshLedgerBaseline),
-      tagSource("device ledger", refreshDeviceLedger),
+      tagSource("device ledger", refreshDeviceLedger), tagSource("psdsr", refreshPsdsr),
     ];
     if (WAREHOUSE_PENDING_ENABLED) tasks.push(tagSource("warehouse pending", refreshWarehousePending));
     return Promise.all(tasks);
-  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshWarehousePending]);
+  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshPsdsr, refreshWarehousePending]);
   const loadAll = React.useCallback(async () => {
     try {
       setDbError(null);
@@ -200,6 +211,7 @@ export function useAppData() {
   const refreshers = {
     depots: refreshDepots, stock_movements: refreshStockBalances,
     submissions: refreshSubmissions, device_ledger_baseline: refreshLedgerBaseline, device_ledger: refreshDeviceLedger,
+    psdsr_weekly: refreshPsdsr,
     ...(WAREHOUSE_PENDING_ENABLED ? { warehouse_pending_stock: refreshWarehousePending } : {}),
   };
   React.useEffect(() => {
@@ -306,6 +318,24 @@ export function useAppData() {
     await refreshWarehousePending();
     return codes.reduce((sum, c) => sum + byDepotMap[c].length, 0);
   }, [writeWarehousePending, refreshWarehousePending]);
+  // One upsert per depot for a week's PSDSR entry -- re-pasting the same period_date
+  // overwrites that depot's row for the week rather than duplicating it (unique on
+  // depot_code+period_date).
+  const savePsdsrBulk = React.useCallback(async (byDepotMap, enteredBy, periodDate) => {
+    const codes = Object.keys(byDepotMap);
+    if (!codes.length) throw new Error("No matched rows to save yet — check the depot names.");
+    const rows = codes.map((code) => ({
+      depot_code: code, period_date: periodDate,
+      total_pdsr: byDepotMap[code].total, sufficient_stocks: byDepotMap[code].sufficient,
+      entered_by: enteredBy || null, updated_at: new Date().toISOString(),
+    }));
+    for (const batch of chunkArr(rows, 500)) {
+      const { error } = await supabaseClient.from("psdsr_weekly").upsert(batch, { onConflict: "depot_code,period_date" });
+      if (error) throw error;
+    }
+    await refreshPsdsr();
+    return codes.length;
+  }, [refreshPsdsr]);
   const clearAllDeviceLedger = React.useCallback(async () => {
     const { error: e1 } = await supabaseClient.from("device_ledger").delete().neq("depot_code", "__none__");
     if (e1) throw e1;
@@ -475,10 +505,10 @@ export function useAppData() {
   }, []);
 
   return {
-    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending,
+    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot,
     loaded, dbError, retryLoad: loadAll, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
-    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, clearAllDeviceLedger, updateDeviceStatus,
+    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
     captureSnapshot, fetchSnapshot, fetchSnapshotRange,
   };

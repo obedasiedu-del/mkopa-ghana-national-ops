@@ -6,7 +6,7 @@ import { KpiTile, Breadcrumb } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { fmtNum, REGION_ORDER, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, trueAgePct } from "../lib/domain.js";
-import { depotsForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope } from "../lib/selectors.js";
+import { depotsForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, psdsrStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
 export function RegionPage() {
@@ -23,6 +23,7 @@ export function RegionPage() {
   const agedPct = c.inTrade ? Math.round((agedTotal / c.inTrade) * 1000) / 10 : null;
   const aged14Total = c.urgent;
   const trueAge = trueAgePct(c);
+  const psdsr = psdsrStatsForScope(data, region);
   const totalStock = stats.deviceTotal + c.total;
   const fifo = stats.fifoCompliance;
   const userIsAdmin = isAdmin(auth.role);
@@ -70,6 +71,7 @@ export function RegionPage() {
       userIsAdmin && React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
       React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
       React.createElement(KpiTile, { label: "True Age", value: trueAge === null ? "—" : trueAge + "%", foot: "14d+ share of active (in-trade) stock" }),
+      React.createElement(KpiTile, { label: "PSDSR", value: psdsr.pct === null ? "—" : psdsr.pct + "%", foot: fmtNum(psdsr.depotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" }),
       React.createElement(KpiTile, { label: "FIFO Compliance", value: fifo.pct === null ? "—" : fifo.pct + "%", foot: fmtNum(fifo.sold) + "/" + fmtNum(fifo.cohort) + " aged stock sold this week" }),
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiTile, { label: "Active Depots", value: fmtNum(stats.activeDepots), foot: (stats.totalDepots - stats.activeDepots) + " closed" }),

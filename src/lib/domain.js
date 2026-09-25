@@ -65,6 +65,7 @@ export const KPI_TARGETS = {
   submissionPct: { min: 100 }, // % of active depots with today's submission on file
   scCoveragePct: { min: 100 }, // % of active depots with a filled SC seat
   haltedCount: { max: 0 },     // depots currently on allocation halt
+  psdsrPct: { min: 70 },       // SC Scorecard target for PSDSR (Central Region policy)
 };
 export function kpiBadge(key, value) {
   const t = KPI_TARGETS[key];
@@ -77,7 +78,7 @@ export function kpiBadge(key, value) {
 // isn't confused with a 3-unit swing in a count KPI.
 // Which snapshot metric keys are percentages (drives the "pp" suffix in kpiDeltaText and the
 // axis scale in the sparkline) -- everything else is a plain count.
-export const KPI_PCT_METRICS = { agedPct: true, trueAgePct: true, fifoPct: true, submissionPct: true, scCoveragePct: true };
+export const KPI_PCT_METRICS = { agedPct: true, trueAgePct: true, fifoPct: true, submissionPct: true, scCoveragePct: true, psdsrPct: true };
 export function kpiDeltaText(diff, isPct, days) {
   if (diff === null || diff === undefined || Number.isNaN(diff)) return null;
   const rounded = Math.round(diff * 10) / 10;
@@ -614,6 +615,62 @@ export function parseDepotStockPaste(text, depots) {
     byDepot[code][model].returned += returned;
   });
   return { byDepot, skipped, unmatchedRows, unmatchedCounts };
+}
+
+// PSDSR (Productive [agents with] Sufficient Stock Ratio) weekly bulk paste -- one row per
+// depot: Depot, Total PDSR (count of productive DSRs), Sufficient Stocks (of those, how many
+// carry enough stock). This is deliberately the exact 3-column shape the source system's own
+// weekly export already produces (verified against a real file), so it can be pasted in
+// as-is with no reformatting. PSDSR % itself is computed from these two counts, not pasted.
+export function parsePsdsrPaste(text, depots) {
+  const lines = splitPasteLines(text);
+  const depotIndex = buildDepotIndex(depots);
+  const matchCache = {};
+  function matchCached(depotText) {
+    const key = normalizeDepotName(depotText);
+    if (!(key in matchCache)) matchCache[key] = matchDepotForShop(depotText, depotIndex);
+    return matchCache[key];
+  }
+  const byDepot = {};
+  const unmatchedRows = [];
+  const unmatchedCounts = {};
+  let skipped = 0;
+  lines.forEach((line, idx) => {
+    let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
+    cells = cells.map((c) => c.trim());
+    if (idx === 0 && /^(depot|shop)/i.test(cells[0] || "") && /pdsr|total/i.test(cells[1] || "")) return;
+    const depotText = cells[0] || "";
+    let total = parseInt(cells[1] || "", 10);
+    let sufficient = parseInt(cells[2] || "", 10);
+    if (!depotText || Number.isNaN(total)) { skipped++; return; }
+    if (total < 0) total = 0;
+    if (Number.isNaN(sufficient) || sufficient < 0) sufficient = 0;
+    if (sufficient > total) sufficient = total; // a typo shouldn't be able to produce >100%
+    // PSDSR data (unlike a device paste) includes indirect-channel/partner-shop agents
+    // directly, with no separate Indirect Channel bucket to route them to -- and critically,
+    // a partner shop named after the same town as a real depot (e.g. "Franko Kasoa" vs
+    // "Kasoa Depot") fuzzy-matches that depot's single-word name and would silently
+    // overwrite its real entry if matched normally. Checked and excluded before the fuzzy
+    // match is even attempted, not after.
+    if (isIndirectChannelShop(depotText)) {
+      unmatchedCounts[depotText] = (unmatchedCounts[depotText] || 0) + 1;
+      unmatchedRows.push({ depotText, total, sufficient, reason: "Indirect/partner shop, not a depot" });
+      return;
+    }
+    const code = matchCached(depotText);
+    if (!code) {
+      const key = depotText || "(blank depot)";
+      unmatchedCounts[key] = (unmatchedCounts[key] || 0) + 1;
+      unmatchedRows.push({ depotText, total, sufficient, reason: "Not matched to a depot" });
+      return;
+    }
+    byDepot[code] = { total, sufficient }; // last row for a depot wins if it appears twice in one paste
+  });
+  return { byDepot, skipped, unmatchedRows, unmatchedCounts };
+}
+export function psdsrPct(row) {
+  if (!row || !row.total) return null;
+  return Math.round((row.sufficient / row.total) * 1000) / 10;
 }
 
 // Bulk paste for stock movements (transfers/receipts/issues) -- e.g. a waybill/transit

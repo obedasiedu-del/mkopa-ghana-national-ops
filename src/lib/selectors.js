@@ -105,6 +105,22 @@ export function overviewStats(data, scope) {
   };
 }
 
+// Rolls up the latest weekly PSDSR entries (data.psdsrByDepot) across a scope's depots --
+// depotsReporting/totalDepots lets a caller show "X of Y depots reporting" rather than
+// silently treating a depot with no entry yet as 0%.
+export function psdsrStatsForScope(data, scope) {
+  const depots = depotsForScope(data.depots, scope);
+  let total = 0, sufficient = 0, depotsReporting = 0;
+  depots.forEach((d) => {
+    const row = data.psdsrByDepot[d.code];
+    if (!row) return;
+    total += row.total;
+    sufficient += row.sufficient;
+    depotsReporting++;
+  });
+  return { total, sufficient, depotsReporting, totalDepots: depots.length, pct: total ? Math.round((sufficient / total) * 1000) / 10 : null };
+}
+
 // Flattens overviewStats() into the plain numeric shape stored in kpi_snapshots.metrics --
 // exactly the fields the National page's KPI cards need for their value/badge/delta/
 // sparkline, nothing else. haltedCount is passed in separately since overviewStats() doesn't
