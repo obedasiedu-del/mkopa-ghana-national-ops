@@ -110,7 +110,7 @@ export function NationalOverviewPage() {
       React.createElement(KpiTile, { label: "Allocation Halts", value: fmtNum(haltedDepots.length), foot: haltPhase ? haltPhase.label + " active" : "policy not started" })),
     React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 22 } },
       STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements() }, "View Stock Movement Log →"),
-      React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit() }, "View Audit History →"),
+      userIsAdmin && React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit() }, "View Audit History →"),
       React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts() }, "View Halt Status Report →")),
     (userIsAdmin || STOCK_MOVEMENT_ENABLED) && React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
       userIsAdmin && React.createElement("div", null,
