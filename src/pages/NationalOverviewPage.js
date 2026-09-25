@@ -28,7 +28,7 @@ function RegionCard({ region }) {
 function AgentsByDsrTable() {
   const { data, openModal } = useApp();
   const groups = groupDevicesByAgent(ledgerDevicesForScope(data.deviceLedger, data.depots, "national")).slice(0, 20);
-  return React.createElement("div", { className: "table-wrap" },
+  return React.createElement("div", { className: "table-wrap table-wrap-scroll" },
     React.createElement("table", null,
       React.createElement("thead", null, React.createElement("tr", null,
         React.createElement("th", null, "Agent / DSR"), React.createElement("th", null, "Depot(s)"),
