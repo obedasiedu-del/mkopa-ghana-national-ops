@@ -10,7 +10,7 @@ import { isAdmin } from "../data/useAuth.js";
 
 const SNAPSHOT_RANGE_DAYS = 14;
 const SNAPSHOT_DELTA_DAYS = 3;
-const SNAPSHOT_TARGET_KEYS = ["submissionPct", "scCoveragePct", "haltedCount", "psdsrPct"];
+const SNAPSHOT_TARGET_KEYS = ["haltedCount", "trueAgePct", "psdsrPct"];
 
 function RegionCard({ region }) {
   const { data, goRegion } = useApp();

@@ -62,10 +62,12 @@ export function fmtNum(n) {
 // for its own FIFO Compliance card. Keys match the flat metrics object snapshotMetricsFromStats
 // produces (see selectors.js).
 export const KPI_TARGETS = {
-  submissionPct: { min: 100 }, // % of active depots with today's submission on file
-  scCoveragePct: { min: 100 }, // % of active depots with a filled SC seat
   haltedCount: { max: 0 },     // depots currently on allocation halt
-  psdsrPct: { min: 70 },       // SC Scorecard target for PSDSR (Central Region policy)
+  trueAgePct: { max: 8 },      // SC Scorecard target for True Age (lower is better)
+  psdsrPct: { min: 70 },       // SC Scorecard target for PSDSR
+  // SC Coverage and Daily Submission Status are informational only (no target) -- only the
+  // SC Scorecard components (True Age, PSDSR, and Inventory Accuracy once it's built) and
+  // Allocation Halts carry a real target.
 };
 export function kpiBadge(key, value) {
   const t = KPI_TARGETS[key];
