@@ -1,7 +1,7 @@
 "use strict";
 import React from "react";
 import { supabaseClient } from "../supabaseClient.js";
-import { PSEUDO_CODES, WAREHOUSE_PENDING_ENABLED } from "../lib/domain.js";
+import { PSEUDO_CODES, WAREHOUSE_PENDING_ENABLED, todayStr } from "../lib/domain.js";
 
 const PAGE_SIZE = 1000;
 // How many pages of one table are ever in flight at once. warehouse_pending_stock alone is
@@ -437,6 +437,29 @@ export function useAppData() {
     if (error) throw error;
     return count || 0;
   }, []);
+  // Daily KPI history for the National page's date picker/sparklines/deltas -- upserted
+  // opportunistically by whichever user's page load happens to compute live stats first
+  // (or last) each day, rather than needing a cron/edge-function job. Only today's row is
+  // ever writable (see the RLS policy), so a capture failure is never surfaced as a banner
+  // error -- it's a nice-to-have history, not something the dashboard depends on to function.
+  const captureSnapshot = React.useCallback(async (scope, metrics) => {
+    const { error } = await supabaseClient.from("kpi_snapshots").upsert(
+      { scope, snapshot_date: todayStr(), metrics, updated_at: new Date().toISOString() },
+      { onConflict: "scope,snapshot_date" }
+    );
+    if (error) throw error;
+  }, []);
+  const fetchSnapshot = React.useCallback(async (scope, date) => {
+    const { data, error } = await supabaseClient.from("kpi_snapshots").select("*").eq("scope", scope).eq("snapshot_date", date).maybeSingle();
+    if (error) throw error;
+    return data ? { date: data.snapshot_date, metrics: data.metrics } : null;
+  }, []);
+  const fetchSnapshotRange = React.useCallback(async (scope, fromDate, toDate) => {
+    const { data, error } = await supabaseClient.from("kpi_snapshots").select("*")
+      .eq("scope", scope).gte("snapshot_date", fromDate).lte("snapshot_date", toDate).order("snapshot_date", { ascending: true });
+    if (error) throw error;
+    return (data || []).map((r) => ({ date: r.snapshot_date, metrics: r.metrics }));
+  }, []);
   const fetchAuditLog = React.useCallback(async ({ depotCode, depotCodes, sinceIso, untilIso, limit = 200 } = {}) => {
     let q = supabaseClient.from("audit_log").select("*").order("occurred_at", { ascending: false }).limit(limit);
     if (depotCode) q = q.eq("depot_code", depotCode);
@@ -457,5 +480,6 @@ export function useAppData() {
     saveDepotField, saveSubmission,
     saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
+    captureSnapshot, fetchSnapshot, fetchSnapshotRange,
   };
 }

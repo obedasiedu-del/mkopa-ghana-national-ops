@@ -55,6 +55,36 @@ export const USER_ROLES = [
 export function fmtNum(n) {
   return n === null || n === undefined || Number.isNaN(n) ? "—" : String(n);
 }
+// KPI cards on the National page show a target badge (ON/BELOW/ABOVE/NO TARGET), mirroring
+// the Retail Pulse tool's daily KPI cards. Only KPIs with an unambiguous, already-agreed
+// business target get a real min/max here -- everything else (Total Stock, Stock Aging %,
+// FIFO Compliance, etc.) is informational and shows "NO TARGET", same as Retail Pulse does
+// for its own FIFO Compliance card. Keys match the flat metrics object snapshotMetricsFromStats
+// produces (see selectors.js).
+export const KPI_TARGETS = {
+  submissionPct: { min: 100 }, // % of active depots with today's submission on file
+  scCoveragePct: { min: 100 }, // % of active depots with a filled SC seat
+  haltedCount: { max: 0 },     // depots currently on allocation halt
+};
+export function kpiBadge(key, value) {
+  const t = KPI_TARGETS[key];
+  if (!t || value === null || value === undefined) return { label: "NO TARGET", cls: "pill-muted" };
+  if (t.min !== undefined) return value >= t.min ? { label: "ON TARGET", cls: "pill-success" } : { label: "BELOW TARGET", cls: "pill-critical" };
+  return value <= t.max ? { label: "ON TARGET", cls: "pill-success" } : { label: "ABOVE TARGET", cls: "pill-critical" };
+}
+// Formats a delta (current - value N days ago) for the small "vs Nd ago" line under a KPI
+// card's badge. Percentage-point metrics get a "pp" suffix so a 3-point swing in a % KPI
+// isn't confused with a 3-unit swing in a count KPI.
+// Which snapshot metric keys are percentages (drives the "pp" suffix in kpiDeltaText and the
+// axis scale in the sparkline) -- everything else is a plain count.
+export const KPI_PCT_METRICS = { agedPct: true, fifoPct: true, submissionPct: true, scCoveragePct: true };
+export function kpiDeltaText(diff, isPct, days) {
+  if (diff === null || diff === undefined || Number.isNaN(diff)) return null;
+  const rounded = Math.round(diff * 10) / 10;
+  const arrow = rounded > 0 ? "↑" : rounded < 0 ? "↓" : "→";
+  const mag = Math.abs(rounded) + (isPct ? "pp" : "");
+  return arrow + " " + mag + " vs " + days + "d ago";
+}
 export function todayStr() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
@@ -64,6 +94,11 @@ export function fmtDateShort(iso) {
   const d = new Date(iso + "T00:00:00");
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+export function addDaysStr(dateStr, n) {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 export function fmtDateTime(iso) {
   if (!iso) return "—";

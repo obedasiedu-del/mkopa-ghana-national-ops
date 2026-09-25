@@ -105,6 +105,26 @@ export function overviewStats(data, scope) {
   };
 }
 
+// Flattens overviewStats() into the plain numeric shape stored in kpi_snapshots.metrics --
+// exactly the fields the National page's KPI cards need for their value/badge/delta/
+// sparkline, nothing else. haltedCount is passed in separately since overviewStats() doesn't
+// compute halt status itself (haltStatusesForScope does, from a different code path).
+export function snapshotMetricsFromStats(stats, haltedCount) {
+  const c = stats.ledgerCounts;
+  const agedPct = c.total ? Math.round((stats.aged10Plus / c.total) * 1000) / 10 : null;
+  const submissionPct = stats.expectedSubmissions ? Math.round((stats.submittedToday / stats.expectedSubmissions) * 1000) / 10 : null;
+  const scCoveragePct = stats.activeDepots ? Math.round((stats.scFilled / stats.activeDepots) * 1000) / 10 : null;
+  return {
+    totalStock: stats.deviceTotal + c.total, deviceTotal: stats.deviceTotal, dsrTotal: c.total,
+    agedPct, agedTotal: stats.aged10Plus, aged14Total: c.urgent,
+    fifoPct: stats.fifoCompliance.pct, fifoCohort: stats.fifoCompliance.cohort, fifoSold: stats.fifoCompliance.sold,
+    activeDepots: stats.activeDepots, totalDepots: stats.totalDepots,
+    scFilled: stats.scFilled, scVacant: stats.scVacant, scCoveragePct,
+    submittedToday: stats.submittedToday, expectedSubmissions: stats.expectedSubmissions, submissionPct,
+    haltedCount: haltedCount || 0,
+  };
+}
+
 // Daily movement counts for the last `days` days (today inclusive), zero-filled so a
 // quiet day still shows as a point rather than a gap. `rows` is whatever fetchMovements
 // returned for the same window.

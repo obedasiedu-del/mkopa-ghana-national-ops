@@ -1,12 +1,28 @@
 "use strict";
 import React from "react";
 import { scoreColor, daysAllocated, ledgerTierFor, agingDate } from "../lib/domain.js";
+import { Sparkline } from "./charts/Sparkline.js";
 
 export function KpiTile({ label, value, foot }) {
   return React.createElement("div", { className: "kpi-tile" },
     React.createElement("div", { className: "kpi-label" }, label),
     React.createElement("div", { className: "kpi-value" }, value),
     React.createElement("div", { className: "kpi-foot" }, foot));
+}
+// Retail-Pulse-style KPI card: label + target badge, big value, foot + delta-vs-N-days-ago,
+// and a trend sparkline -- an opt-in upgrade of KpiTile used where daily snapshot history is
+// available (currently just the National page). badge/deltaText/sparkPoints are all optional
+// so a card can render with only the fields its caller actually has.
+export function KpiCard({ label, value, foot, badge, deltaText, sparkPoints }) {
+  const sparkColor = badge && badge.cls === "pill-critical" ? "var(--critical)" : "var(--success)";
+  return React.createElement("div", { className: "kpi-tile" },
+    React.createElement("div", { className: "kpi-card-top" },
+      React.createElement("div", { className: "kpi-label" }, label),
+      badge && React.createElement(Pill, { cls: badge.cls }, badge.label)),
+    React.createElement("div", { className: "kpi-value" }, value),
+    React.createElement("div", { className: "kpi-foot" }, foot),
+    deltaText && React.createElement("div", { className: "kpi-delta" }, deltaText),
+    sparkPoints && React.createElement(Sparkline, { points: sparkPoints, color: sparkColor }));
 }
 export function Pill({ cls, children }) {
   return React.createElement("span", { className: "pill " + cls },

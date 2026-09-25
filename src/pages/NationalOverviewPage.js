@@ -2,12 +2,16 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { GhanaMap } from "../components/GhanaMap.js";
-import { KpiTile, EmptyRow } from "../components/ui.js";
+import { KpiTile, KpiCard, EmptyRow } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
-import { REGION_ORDER, fmtNum, groupDevicesByAgent, countsForDevices, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED } from "../lib/domain.js";
-import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope } from "../lib/selectors.js";
+import { REGION_ORDER, fmtNum, groupDevicesByAgent, countsForDevices, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
+import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope, snapshotMetricsFromStats } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
+
+const SNAPSHOT_RANGE_DAYS = 14;
+const SNAPSHOT_DELTA_DAYS = 3;
+const SNAPSHOT_TARGET_KEYS = ["submissionPct", "scCoveragePct", "haltedCount"];
 
 function RegionCard({ region }) {
   const { data, goRegion } = useApp();
@@ -58,16 +62,70 @@ export function NationalOverviewPage() {
   const stats = overviewStats(data, "national");
   const c = stats.ledgerCounts;
   const wh = stats.warehousePendingCounts;
-  const agedTotal = stats.aged10Plus;
-  const agedPct = c.total ? Math.round((agedTotal / c.total) * 1000) / 10 : null;
-  const aged14Total = c.urgent;
-  const totalStock = stats.deviceTotal + c.total;
-  const fifo = stats.fifoCompliance;
   const userIsAdmin = isAdmin(auth.role);
 
   const haltStatuses = React.useMemo(() => haltStatusesForScope(data, "national"), [data]);
   const haltedDepots = haltStatuses.filter((s) => s.halted);
   const haltPhase = haltStatuses[0]?.phase || null;
+
+  // "Viewing as of" date picker -- KPI card values/badges/deltas/sparklines below switch to
+  // a stored daily snapshot for any past date; everything else on the page (map, halt
+  // banner, agents table) always reflects live current data regardless of the picker.
+  const liveMetrics = React.useMemo(() => snapshotMetricsFromStats(stats, haltedDepots.length), [stats, haltedDepots.length]);
+  const [viewDate, setViewDate] = React.useState(todayStr());
+  const isToday = viewDate === todayStr();
+  const [rangeSnapshots, setRangeSnapshots] = React.useState([]);
+  const [rangeLoading, setRangeLoading] = React.useState(false);
+  React.useEffect(() => {
+    let cancelled = false;
+    setRangeLoading(true);
+    const fromDate = addDaysStr(viewDate, -(SNAPSHOT_RANGE_DAYS - 1));
+    data.fetchSnapshotRange("national", fromDate, viewDate)
+      .then((rows) => { if (!cancelled) setRangeSnapshots(rows); })
+      .catch(() => { if (!cancelled) setRangeSnapshots([]); })
+      .finally(() => { if (!cancelled) setRangeLoading(false); });
+    return () => { cancelled = true; };
+  }, [data, viewDate]);
+  const snapshotByDate = React.useMemo(() => {
+    const m = {};
+    rangeSnapshots.forEach((r) => { m[r.date] = r.metrics; });
+    return m;
+  }, [rangeSnapshots]);
+  const dm = isToday ? liveMetrics : (snapshotByDate[viewDate] || null);
+  const deltaMetrics = snapshotByDate[addDaysStr(viewDate, -SNAPSHOT_DELTA_DAYS)] || null;
+  function buildSparkline(key) {
+    const fromDate = addDaysStr(viewDate, -(SNAPSHOT_RANGE_DAYS - 1));
+    const out = [];
+    for (let i = 0; i < SNAPSHOT_RANGE_DAYS; i++) {
+      const d = addDaysStr(fromDate, i);
+      if (isToday && d === viewDate) { out.push(liveMetrics[key] ?? null); continue; }
+      const m = snapshotByDate[d];
+      out.push(m ? (m[key] ?? null) : null);
+    }
+    return out;
+  }
+  function cardExtras(key) {
+    const value = dm ? dm[key] : null;
+    const badge = dm ? kpiBadge(key, value) : null;
+    const past = deltaMetrics ? deltaMetrics[key] : null;
+    const diff = value !== null && value !== undefined && past !== null && past !== undefined ? value - past : null;
+    const deltaText = diff !== null ? kpiDeltaText(diff, !!KPI_PCT_METRICS[key], SNAPSHOT_DELTA_DAYS) : null;
+    return { badge, deltaText, sparkPoints: buildSparkline(key) };
+  }
+  const onTargetCount = dm ? SNAPSHOT_TARGET_KEYS.filter((k) => kpiBadge(k, dm[k]).cls === "pill-success").length : 0;
+  const offTargetCount = dm ? SNAPSHOT_TARGET_KEYS.filter((k) => kpiBadge(k, dm[k]).cls === "pill-critical").length : 0;
+  // Opportunistic capture -- once per page mount, after live data has actually loaded, this
+  // upserts today's national snapshot so tomorrow (and every day after) has a "3 days ago"
+  // and a growing sparkline to look back on. No cron/edge function needed: with ~100 people
+  // loading this page daily, today's row gets written (and re-written with fresher numbers)
+  // many times before midnight locks it in as history.
+  const capturedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (capturedRef.current || !data.loaded) return;
+    capturedRef.current = true;
+    data.captureSnapshot("national", liveMetrics).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.loaded]);
 
   const [movements7d, setMovements7d] = React.useState(null);
   React.useEffect(() => {
@@ -95,19 +153,26 @@ export function NationalOverviewPage() {
         React.createElement("strong", null, haltedDepots.length, " depot", haltedDepots.length === 1 ? "" : "s", " on allocation halt"),
         " under ", haltPhase.label, " — aged stock (14d+) above the phase limit. ",
         React.createElement("button", { className: "btn btn-sm", style: { marginLeft: 6 }, onClick: () => goHalts() }, "View Halt Status Report →"))),
+    React.createElement("div", { className: "kpi-datebar" },
+      React.createElement("span", { style: { fontSize: 12.5, color: "var(--text-muted)" } }, "Viewing as of"),
+      React.createElement("input", { type: "date", className: "field-input", value: viewDate, max: todayStr(), onChange: (e) => setViewDate(e.target.value || todayStr()) }),
+      !isToday && React.createElement("button", { className: "btn btn-sm", onClick: () => setViewDate(todayStr()) }, "Latest"),
+      React.createElement("div", { className: "kpi-datebar-summary" },
+        dm ? (onTargetCount + offTargetCount) + " KPIs tracked · " + onTargetCount + " on target · " + offTargetCount + " off target" : (rangeLoading ? "Loading…" : "")),
+      !isToday && !dm && !rangeLoading && React.createElement("div", { className: "kpi-datebar-note" }, "No snapshot recorded for " + viewDate + " yet — history accumulates day by day from when this was switched on.")),
     React.createElement("div", { className: "kpi-grid" },
-      React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),
-      React.createElement(KpiTile, { label: "Devices at Depots", value: fmtNum(stats.deviceTotal), foot: "from daily submissions, all regions" }),
-      React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level, all regions" }),
+      React.createElement(KpiCard, { label: "Total Stock", value: dm ? fmtNum(dm.totalStock) : "—", foot: "at depots + with DSRs", ...cardExtras("totalStock") }),
+      React.createElement(KpiCard, { label: "Devices at Depots", value: dm ? fmtNum(dm.deviceTotal) : "—", foot: "from daily submissions, all regions", ...cardExtras("deviceTotal") }),
+      React.createElement(KpiCard, { label: "Devices with DSRs", value: dm ? fmtNum(dm.dsrTotal) : "—", foot: "serial-level, all regions", ...cardExtras("dsrTotal") }),
       WAREHOUSE_PENDING_ENABLED && React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
-      React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
-      userIsAdmin && React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
-      React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
-      React.createElement(KpiTile, { label: "FIFO Compliance", value: fifo.pct === null ? "—" : fifo.pct + "%", foot: fmtNum(fifo.sold) + "/" + fmtNum(fifo.cohort) + " aged stock sold this week" }),
+      React.createElement(KpiCard, { label: "Daily Submission Status", value: dm ? dm.submittedToday + "/" + dm.expectedSubmissions : "—", foot: "depots with today's entry", ...cardExtras("submissionPct") }),
+      userIsAdmin && React.createElement(KpiCard, { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", ...cardExtras("agedPct") }),
+      React.createElement(KpiCard, { label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—", foot: "halt-policy threshold", ...cardExtras("aged14Total") }),
+      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold this week" : "", ...cardExtras("fifoPct") }),
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
-      React.createElement(KpiTile, { label: "Active Depots", value: fmtNum(stats.activeDepots), foot: (stats.totalDepots - stats.activeDepots) + " closed" }),
-      React.createElement(KpiTile, { label: "SC Coverage", value: stats.scFilled + "/" + stats.activeDepots, foot: stats.scVacant + " vacant" }),
-      React.createElement(KpiTile, { label: "Allocation Halts", value: fmtNum(haltedDepots.length), foot: haltPhase ? haltPhase.label + " active" : "policy not started" })),
+      React.createElement(KpiCard, { label: "Active Depots", value: dm ? fmtNum(dm.activeDepots) : "—", foot: dm ? (dm.totalDepots - dm.activeDepots) + " closed" : "", ...cardExtras("activeDepots") }),
+      React.createElement(KpiCard, { label: "SC Coverage", value: dm ? dm.scFilled + "/" + dm.activeDepots : "—", foot: dm ? dm.scVacant + " vacant" : "", ...cardExtras("scCoveragePct") }),
+      React.createElement(KpiCard, { label: "Allocation Halts", value: dm ? fmtNum(dm.haltedCount) : "—", foot: haltPhase ? haltPhase.label + " active" : "policy not started", ...cardExtras("haltedCount") })),
     React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 22 } },
       STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements() }, "View Stock Movement Log →"),
       userIsAdmin && React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit() }, "View Audit History →"),

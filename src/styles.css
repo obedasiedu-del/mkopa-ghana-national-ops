@@ -126,6 +126,14 @@ a{color:var(--accent-strong);}
 .kpi-label{font-size:11.5px;color:var(--text-muted);font-weight:500;text-transform:uppercase;letter-spacing:0.04em;}
 .kpi-value{font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;margin-top:6px;letter-spacing:-0.01em;}
 .kpi-foot{font-size:11.5px;color:var(--text-faint);margin-top:4px;}
+.kpi-card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px;flex-wrap:wrap;}
+.kpi-card-top .kpi-label{flex:1 1 100px;min-width:0;}
+.kpi-card-top .pill{flex:none;font-size:10px;padding:1px 7px;}
+.kpi-delta{font-size:11px;color:var(--text-muted);margin-top:3px;font-family:'IBM Plex Mono',monospace;}
+.kpi-datebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.kpi-datebar .field-input{padding:6px 10px;font-size:12.5px;}
+.kpi-datebar-summary{font-size:12px;color:var(--text-muted);margin-left:auto;}
+.kpi-datebar-note{font-size:11.5px;color:var(--text-faint);width:100%;}
 
 .section-heading{font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin:26px 0 12px;}
 .section-heading-row{display:flex;align-items:center;justify-content:space-between;margin:26px 0 12px;}
