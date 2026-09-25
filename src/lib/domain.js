@@ -96,11 +96,11 @@ export function submissionTotals(entry) {
   });
   return totals;
 }
-export function daysAllocated(dateStr) {
+export function daysAllocated(dateStr, refDate) {
   if (!dateStr) return null;
   const d = new Date(dateStr + "T00:00:00");
   if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
+  const today = refDate ? new Date(refDate) : new Date();
   today.setHours(0, 0, 0, 0);
   const diff = Math.round((today - d) / 86400000);
   return diff < 0 ? 0 : diff;
@@ -154,6 +154,42 @@ export function countsAtDayThreshold(devices, threshold) {
     if (days !== null && days >= threshold) n++;
   });
   return n;
+}
+// FIFO Compliance: of the devices that were ALREADY aged (14d+) at the start of a trailing
+// window, what fraction actually got sold (not just reallocated/returned) within that
+// window -- i.e. is aged stock clearing via real sales, not just churning between DSRs.
+// There's no stored daily snapshot of the ledger to check "was this aged N days ago"
+// directly, but a device's allocation date is fixed and never changes, so its age at any
+// past date is reconstructible from that alone -- combined with status_updated_at (when it
+// left the aged pool, if it has), that's enough to place each device relative to the window
+// without needing historical snapshots at all.
+export function fifoComplianceStats(devices, windowDays = 7, threshold = 14) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const windowStart = new Date(today);
+  windowStart.setDate(windowStart.getDate() - windowDays);
+
+  let cohort = 0;
+  let sold = 0;
+  devices.forEach((dv) => {
+    const allocDate = agingDate(dv);
+    if (!allocDate) return;
+    const daysAtWindowStart = daysAllocated(allocDate, windowStart);
+    if (daysAtWindowStart === null || daysAtWindowStart < threshold) return; // not yet aged when the window opened
+
+    if (isResolvedStatus(dv.status)) {
+      // Resolved before the window opened, or with no timestamp to place it by, can't be
+      // credited (or blamed) for anything that happened during this specific window.
+      const resolvedAt = dv.statusUpdatedAt ? new Date(dv.statusUpdatedAt) : null;
+      if (!resolvedAt || resolvedAt < windowStart) return;
+      cohort++;
+      if (dv.status === "sold") sold++;
+      return;
+    }
+    cohort++; // still sitting unresolved, and was already aged when the window opened
+  });
+  const pct = cohort ? Math.round((sold / cohort) * 1000) / 10 : null;
+  return { cohort, sold, pct };
 }
 // For a halted (or any) depot's device list: aged 14+ devices (the same netted count the
 // Halt Policy itself uses) grouped by model/SKU, sorted by count descending -- lets you see

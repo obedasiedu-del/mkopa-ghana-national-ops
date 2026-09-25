@@ -1,5 +1,5 @@
 "use strict";
-import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, submissionTotals, todayStr } from "./domain.js";
+import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr } from "./domain.js";
 import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
@@ -75,12 +75,17 @@ export function overviewStats(data, scope) {
   const ledgerDepots = ledgerDepotsForScope(data.depots, scope);
   let ledgerCounts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
   let aged10Plus = 0;
+  let fifoCohort = 0, fifoSold = 0;
   ledgerDepots.forEach((d) => {
     const devices = ledgerDevices(data.deviceLedger, d.code);
     const c = countsForDevices(devices);
     Object.keys(ledgerCounts).forEach((k) => { ledgerCounts[k] += c[k]; });
     aged10Plus += countsAtDayThreshold(devices, 10);
+    const fifo = fifoComplianceStats(devices);
+    fifoCohort += fifo.cohort;
+    fifoSold += fifo.sold;
   });
+  const fifoCompliance = { cohort: fifoCohort, sold: fifoSold, pct: fifoCohort ? Math.round((fifoSold / fifoCohort) * 1000) / 10 : null };
   const today = todayStr();
   let submittedToday = 0;
   active.forEach((d) => {
@@ -95,7 +100,7 @@ export function overviewStats(data, scope) {
   return {
     activeDepots: active.length, totalDepots: depots.length,
     scFilled: filled.length, scVacant: active.length - filled.length,
-    deviceTotal, ledgerCounts, aged10Plus, warehousePendingCounts,
+    deviceTotal, ledgerCounts, aged10Plus, warehousePendingCounts, fifoCompliance,
     submittedToday, expectedSubmissions: active.length,
   };
 }
