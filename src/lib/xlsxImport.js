@@ -79,6 +79,52 @@ export function readWarehouseStockSheet(wb, sheetName) {
   return { textRows, totalRows };
 }
 
+// Same idea for the PSDSR weekly export -- prefer a sheet named for it, else sniff for its
+// distinctive "Total PDSR" / "Sufficient Stocks" header pair (the real export's first-column
+// header is an arbitrary leftover label, not something reliably named, so it's never used to
+// identify the sheet).
+export function guessPsdsrSheet(wb) {
+  const byName = wb.SheetNames.find((n) => /psdsr/i.test(n));
+  if (byName) return byName;
+  const byHeader = wb.SheetNames.find((n) => sheetLooksLikePsdsr(wb, n));
+  return byHeader || wb.SheetNames[0];
+}
+function findPsdsrHeaderRow(wb, sheetName) {
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: "", blankrows: false });
+  const idx = aoa.findIndex((row) => {
+    const norm = row.map(normalizeHeader);
+    return norm.some((h) => /total.*pdsr|pdsr.*total/.test(h)) && norm.some((h) => h.indexOf("sufficient") !== -1);
+  });
+  return { aoa, idx };
+}
+export function sheetLooksLikePsdsr(wb, sheetName) {
+  return findPsdsrHeaderRow(wb, sheetName).idx !== -1;
+}
+// A PSDSR export's header row isn't necessarily row 1 -- the real file has blank leading
+// rows -- so this scans down for the "Total PDSR"/"Sufficient..." row and treats everything
+// below it as data, converting straight into the same tab-separated Depot/Total/Sufficient
+// text parsePsdsrPaste() already knows how to read (the depot name is always the first
+// column in the real export, whatever its own header text happens to say).
+export function readPsdsrSheet(wb, sheetName) {
+  const { aoa, idx: headerIdx } = findPsdsrHeaderRow(wb, sheetName);
+  if (headerIdx === -1) throw new Error('Could not find "Total PDSR" / "Sufficient Stocks" columns on sheet "' + sheetName + '".');
+  const header = aoa[headerIdx].map(normalizeHeader);
+  const totalIdx = header.findIndex((h) => /total.*pdsr|pdsr.*total/.test(h));
+  const suffIdx = header.findIndex((h) => h.indexOf("sufficient") !== -1);
+  const textRows = [];
+  let totalRows = 0;
+  for (let i = headerIdx + 1; i < aoa.length; i++) {
+    const row = aoa[i];
+    const depot = row[0];
+    const totalNum = Number(row[totalIdx]);
+    if (!depot || !Number.isFinite(totalNum)) continue;
+    totalRows++;
+    const suffNum = Number(row[suffIdx]);
+    textRows.push(String(depot).trim() + "\t" + totalNum + "\t" + (Number.isFinite(suffNum) ? suffNum : 0));
+  }
+  return { textRows, totalRows };
+}
+
 function excelSerialToDate(serial) {
   return new Date(Math.round((serial - 25569) * 86400000));
 }
