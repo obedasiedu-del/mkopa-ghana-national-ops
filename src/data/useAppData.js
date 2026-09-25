@@ -168,8 +168,8 @@ export function useAppData() {
     body.updated_at = new Date().toISOString();
     const { error } = await supabaseClient.from("depots").update(body).eq("code", code);
     if (error) throw error;
-    await refreshDepots();
-  }, [refreshDepots]);
+    setDepots((prev) => (prev[code] ? { ...prev, [code]: { ...prev[code], ...patch } } : prev));
+  }, []);
 
   const saveSubmission = React.useCallback(async (depotCode, dateStr, submittedBy, modelsObj) => {
     const { error } = await supabaseClient.from("submissions").upsert(
@@ -177,8 +177,16 @@ export function useAppData() {
       { onConflict: "depot_code,date" }
     );
     if (error) throw error;
-    await refreshSubmissions();
-  }, [refreshSubmissions]);
+    const entry = { date: dateStr, submittedBy: submittedBy || "", models: modelsObj };
+    setSubmissionsByDepot((prev) => {
+      const list = prev[depotCode] || [];
+      const idx = list.findIndex((s) => s.date === dateStr);
+      const nextList = idx === -1
+        ? list.concat(entry).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+        : list.map((s, i) => (i === idx ? entry : s));
+      return { ...prev, [depotCode]: nextList };
+    });
+  }, []);
 
   const writeLedgerBaseline = React.useCallback(async (depotCode, setBy, devicesArr) => {
     const { error: delErr } = await supabaseClient.from("device_ledger").delete().eq("depot_code", depotCode);
@@ -249,12 +257,22 @@ export function useAppData() {
     await Promise.all([refreshDeviceLedger(), refreshLedgerBaseline()]);
   }, [refreshDeviceLedger, refreshLedgerBaseline]);
   const updateDeviceStatus = React.useCallback(async (depotCode, serial, newStatus, updatedBy) => {
+    const statusUpdatedAt = new Date().toISOString();
+    const statusUpdatedBy = updatedBy || "";
     const { error } = await supabaseClient.from("device_ledger").update({
-      status: newStatus, status_updated_at: new Date().toISOString(), status_updated_by: updatedBy || "",
+      status: newStatus, status_updated_at: statusUpdatedAt, status_updated_by: statusUpdatedBy,
     }).eq("depot_code", depotCode).eq("serial", serial);
     if (error) throw error;
-    await refreshDeviceLedger();
-  }, [refreshDeviceLedger]);
+    setDeviceLedger((prev) => {
+      const list = prev[depotCode];
+      if (!list) return prev;
+      const idx = list.findIndex((d) => d.serial === serial);
+      if (idx === -1) return prev;
+      const nextList = list.slice();
+      nextList[idx] = { ...nextList[idx], status: newStatus, statusUpdatedAt, statusUpdatedBy };
+      return { ...prev, [depotCode]: nextList };
+    });
+  }, []);
 
   // Stock Movement and Audit History are fetched on demand (scoped, paginated) rather than
   // held in global state -- both tables grow unboundedly (every device_ledger/depot_stock/
