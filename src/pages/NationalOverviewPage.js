@@ -63,7 +63,7 @@ export function NationalOverviewPage() {
   const aged14Total = c.urgent;
   const totalStock = stats.deviceTotal + c.total;
   const fifo = stats.fifoCompliance;
-  const canBulkEdit = isAdmin(auth.role);
+  const userIsAdmin = isAdmin(auth.role);
 
   const haltStatuses = React.useMemo(() => haltStatusesForScope(data, "national"), [data]);
   const haltedDepots = haltStatuses.filter((s) => s.halted);
@@ -101,7 +101,7 @@ export function NationalOverviewPage() {
       React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level, all regions" }),
       WAREHOUSE_PENDING_ENABLED && React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
       React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
-      React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
+      userIsAdmin && React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
       React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
       React.createElement(KpiTile, { label: "FIFO Compliance", value: fifo.pct === null ? "—" : fifo.pct + "%", foot: fmtNum(fifo.sold) + "/" + fmtNum(fifo.cohort) + " aged stock sold this week" }),
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
@@ -112,8 +112,8 @@ export function NationalOverviewPage() {
       STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements() }, "View Stock Movement Log →"),
       React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit() }, "View Audit History →"),
       React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts() }, "View Halt Status Report →")),
-    React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
-      React.createElement("div", null,
+    (userIsAdmin || STOCK_MOVEMENT_ENABLED) && React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
+      userIsAdmin && React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Aging Distribution"),
         React.createElement(AgingBarChart, { counts: c })),
       STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
@@ -127,7 +127,7 @@ export function NationalOverviewPage() {
     view === "map" ? React.createElement(GhanaMap, null) : React.createElement("div", { className: "territory-grid" }, REGION_ORDER.map((r) => React.createElement(RegionCard, { key: r, region: r }))),
     React.createElement("div", { className: "section-heading", style: { marginTop: 18 } }, "Other Channels"),
     React.createElement("div", { className: "territory-grid", style: { marginBottom: 22 } }, React.createElement(IndirectChannelCard, null)),
-    canBulkEdit && React.createElement(React.Fragment, null,
+    userIsAdmin && React.createElement(React.Fragment, null,
       React.createElement("div", { className: "section-heading-row" },
         React.createElement("div", { className: "section-heading" }, "Bulk device data entry"),
         React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },

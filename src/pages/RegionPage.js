@@ -7,9 +7,10 @@ import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { fmtNum, REGION_ORDER, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED } from "../lib/domain.js";
 import { depotsForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope } from "../lib/selectors.js";
+import { isAdmin } from "../data/useAuth.js";
 
 export function RegionPage() {
-  const { data, route, search, goNational, goMovements, goAudit, goHalts } = useApp();
+  const { data, auth, route, search, goNational, goMovements, goAudit, goHalts } = useApp();
   const region = route.region;
   if (!REGION_ORDER.includes(region)) {
     return React.createElement("div", { className: "content" },
@@ -23,6 +24,7 @@ export function RegionPage() {
   const aged14Total = c.urgent;
   const totalStock = stats.deviceTotal + c.total;
   const fifo = stats.fifoCompliance;
+  const userIsAdmin = isAdmin(auth.role);
   const depots = depotsForScope(data.depots, region);
 
   const haltStatuses = React.useMemo(() => haltStatusesForScope(data, region), [data, region]);
@@ -64,7 +66,7 @@ export function RegionPage() {
       React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level" }),
       WAREHOUSE_PENDING_ENABLED && React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
       React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
-      React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
+      userIsAdmin && React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
       React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
       React.createElement(KpiTile, { label: "FIFO Compliance", value: fifo.pct === null ? "—" : fifo.pct + "%", foot: fmtNum(fifo.sold) + "/" + fmtNum(fifo.cohort) + " aged stock sold this week" }),
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
@@ -75,8 +77,8 @@ export function RegionPage() {
       STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements(region) }, "View Stock Movement Log →"),
       React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit(region) }, "View Audit History →"),
       React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts(region) }, "View Halt Status Report →")),
-    React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
-      React.createElement("div", null,
+    (userIsAdmin || STOCK_MOVEMENT_ENABLED) && React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
+      userIsAdmin && React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Aging Distribution"),
         React.createElement(AgingBarChart, { counts: c })),
       STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
