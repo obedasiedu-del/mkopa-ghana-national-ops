@@ -31,8 +31,8 @@ export const PSEUDO_CODES = [INDIRECT_DEPOT.code, UNRECOGNISED_DEPOT.code, WAREH
 // Urgent / High Risk); day ranges are shown alongside them in the UI, not in the label.
 export const LEDGER_TIERS = [
   { key: "fresh", label: "Fresh", max: 9, cls: "pill-success" },
-  { key: "aged", label: "Aged", min: 10, max: 13, cls: "pill-critical" },
-  { key: "urgent", label: "14+ Days", min: 14, cls: "pill-urgent" },
+  { key: "aged", label: "Aging", min: 10, max: 13, cls: "pill-critical" },
+  { key: "urgent", label: "Aged", min: 14, cls: "pill-urgent" },
 ];
 // The 5 movement categories from the approved architecture (Transfers, Receipts, Issues,
 // Returns, Status changes). A more specific reason (e.g. "allocated to DSR", "sold",
