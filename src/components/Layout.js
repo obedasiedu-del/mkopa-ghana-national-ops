@@ -57,6 +57,11 @@ export function Layout({ children }) {
     React.createElement("div", { className: "main" },
       React.createElement(Topbar, null),
       data.dbError && React.createElement("div", { className: "content", style: { paddingBottom: 0 } },
-        React.createElement("div", { className: "banner" }, React.createElement("span", null, "⚠"), React.createElement("div", null, "Can't reach live storage right now — edits here won't be saved until the connection recovers."))),
+        React.createElement("div", { className: "banner", style: { alignItems: "flex-start" } },
+          React.createElement("span", null, "⚠"),
+          React.createElement("div", { style: { flex: 1 } },
+            React.createElement("div", null, "Can't reach live storage right now — edits here won't be saved until the connection recovers."),
+            React.createElement("div", { className: "mono", style: { fontSize: 11, opacity: 0.75, marginTop: 4 } }, String(data.dbError.message || data.dbError))),
+          React.createElement("button", { className: "btn btn-sm", onClick: () => data.retryLoad(), style: { marginLeft: 12 } }, "Retry"))),
       children));
 }

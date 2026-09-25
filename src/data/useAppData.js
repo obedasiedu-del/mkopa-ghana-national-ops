@@ -122,18 +122,40 @@ export function useAppData() {
     setWarehousePending(map);
   }, []);
 
+  // Tags a refresh failure with which table it came from -- Supabase/fetch errors don't
+  // self-identify the source, and without this every failure collapses into the same
+  // generic message, leaving no way to tell a network drop from an RLS/permission issue
+  // from the resulting banner alone.
+  function tagSource(name, fn) {
+    return fn().catch((e) => { throw new Error(`[${name}] ${e && e.message ? e.message : e}`); });
+  }
+  const loadAllTagged = React.useCallback(() => Promise.all([
+    tagSource("depots", refreshDepots), tagSource("stock balances", refreshStockBalances),
+    tagSource("submissions", refreshSubmissions), tagSource("ledger baseline", refreshLedgerBaseline),
+    tagSource("device ledger", refreshDeviceLedger), tagSource("warehouse pending", refreshWarehousePending),
+  ]), [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshWarehousePending]);
+  const loadAll = React.useCallback(async () => {
+    try {
+      setDbError(null);
+      await loadAllTagged();
+      setLoaded(true);
+    } catch (e) {
+      setDbError(e);
+    }
+  }, [loadAllTagged]);
+
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        await Promise.all([refreshDepots(), refreshStockBalances(), refreshSubmissions(), refreshLedgerBaseline(), refreshDeviceLedger(), refreshWarehousePending()]);
+        await loadAllTagged();
         if (!cancelled) setLoaded(true);
       } catch (e) {
         if (!cancelled) setDbError(e);
       }
     })();
     return () => { cancelled = true; };
-  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshWarehousePending]);
+  }, [loadAllTagged]);
 
   // Debounced realtime refresh -- a bulk paste can insert thousands of device_ledger rows in one
   // go, and Postgres realtime fires one event PER row; without coalescing, that would trigger
@@ -396,7 +418,7 @@ export function useAppData() {
 
   return {
     depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending,
-    loaded, dbError, pseudoCodes: PSEUDO_CODES,
+    loaded, dbError, retryLoad: loadAll, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
     saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
