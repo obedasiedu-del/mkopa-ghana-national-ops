@@ -5,17 +5,28 @@ import { PSEUDO_CODES } from "../lib/domain.js";
 
 const PAGE_SIZE = 1000;
 
+// Pages are fetched in parallel (not one at a time) -- warehouse_pending_stock alone is
+// 70,000+ rows (70+ pages at PAGE_SIZE=1000), and awaiting each page before starting the
+// next turned every login into 70+ sequential round trips just for that one table. A cheap
+// head-count up front tells us how many pages exist, then every page request fires at once.
+function buildPageQuery(table, orderCol, from) {
+  let q = supabaseClient.from(table).select("*").range(from, from + PAGE_SIZE - 1);
+  if (orderCol) q = q.order(orderCol, { ascending: true });
+  return q;
+}
 async function fetchAll(table, orderCol) {
-  let all = [];
-  let from = 0;
-  for (;;) {
-    let q = supabaseClient.from(table).select("*").range(from, from + PAGE_SIZE - 1);
-    if (orderCol) q = q.order(orderCol, { ascending: true });
-    const { data, error } = await q;
+  const { count, error: countErr } = await supabaseClient.from(table).select("*", { count: "exact", head: true });
+  if (countErr) throw countErr;
+  const total = count || 0;
+  if (total === 0) return [];
+  const pageCount = Math.ceil(total / PAGE_SIZE);
+  const pages = await Promise.all(
+    Array.from({ length: pageCount }, (_, p) => buildPageQuery(table, orderCol, p * PAGE_SIZE))
+  );
+  const all = [];
+  for (const { data, error } of pages) {
     if (error) throw error;
-    all = all.concat(data || []);
-    if (!data || data.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
+    if (data) all.push(...data);
   }
   return all;
 }
