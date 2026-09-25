@@ -40,6 +40,10 @@ const COLUMNS = [
     key: "psdsr", label: "PSDSR", sortable: true, numeric: true,
     sortValue: (d) => d._psdsr ?? -1, render: (d) => (d._psdsr === null ? "—" : d._psdsr + "%"),
   },
+  {
+    key: "inventoryAccuracy", label: "Inventory Accuracy", sortable: true, numeric: true,
+    sortValue: (d) => d._inventoryAccuracy ?? -1, render: (d) => (d._inventoryAccuracy === null ? "—" : d._inventoryAccuracy + "%"),
+  },
 ];
 
 export function DepotTable({ depots }) {
@@ -48,11 +52,13 @@ export function DepotTable({ depots }) {
   const enriched = React.useMemo(() => depots.map((d) => {
     const latest = latestSubmissionForDepot(data.submissionsByDepot, d.code);
     const ledgerCounts = countsForDevices(ledgerDevices(data.deviceLedger, d.code));
+    const invAccRow = data.inventoryAccuracyByDepot[d.code];
     return {
       ...d, _devicesAtDepot: latest ? submissionTotals(latest).totalStock : null, _aged14: ledgerCounts.urgent,
       _trueAge: trueAgePct(ledgerCounts), _psdsr: psdsrPct(data.psdsrByDepot[d.code]),
+      _inventoryAccuracy: invAccRow ? invAccRow.pct : null,
     };
-  }), [depots, data.submissionsByDepot, data.deviceLedger, data.psdsrByDepot]);
+  }), [depots, data.submissionsByDepot, data.deviceLedger, data.psdsrByDepot, data.inventoryAccuracyByDepot]);
   const filtered = enriched.filter((d) => !q || (d.name + " " + d.code + " " + d.scName).toLowerCase().includes(q));
   return React.createElement(DataTable, {
     columns: COLUMNS, rows: filtered, rowKey: (d) => d.code, onRowClick: (d) => goDepot(d.code),

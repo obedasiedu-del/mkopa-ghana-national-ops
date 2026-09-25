@@ -65,9 +65,10 @@ export const KPI_TARGETS = {
   haltedCount: { max: 0 },     // depots currently on allocation halt
   trueAgePct: { max: 8 },      // SC Scorecard target for True Age (lower is better)
   psdsrPct: { min: 70 },       // SC Scorecard target for PSDSR
+  inventoryAccuracyPct: { min: 98 }, // SC Scorecard target for Inventory Accuracy
   // SC Coverage and Daily Submission Status are informational only (no target) -- only the
-  // SC Scorecard components (True Age, PSDSR, and Inventory Accuracy once it's built) and
-  // Allocation Halts carry a real target.
+  // SC Scorecard components (True Age, PSDSR, Inventory Accuracy) and Allocation Halts
+  // carry a real target.
 };
 export function kpiBadge(key, value) {
   const t = KPI_TARGETS[key];
@@ -80,7 +81,7 @@ export function kpiBadge(key, value) {
 // isn't confused with a 3-unit swing in a count KPI.
 // Which snapshot metric keys are percentages (drives the "pp" suffix in kpiDeltaText and the
 // axis scale in the sparkline) -- everything else is a plain count.
-export const KPI_PCT_METRICS = { agedPct: true, trueAgePct: true, fifoPct: true, submissionPct: true, scCoveragePct: true, psdsrPct: true };
+export const KPI_PCT_METRICS = { agedPct: true, trueAgePct: true, fifoPct: true, submissionPct: true, scCoveragePct: true, psdsrPct: true, inventoryAccuracyPct: true };
 export function kpiDeltaText(diff, isPct, days) {
   if (diff === null || diff === undefined || Number.isNaN(diff)) return null;
   const rounded = Math.round(diff * 10) / 10;
@@ -673,6 +674,53 @@ export function parsePsdsrPaste(text, depots) {
 export function psdsrPct(row) {
   if (!row || !row.total) return null;
   return Math.round((row.sufficient / row.total) * 1000) / 10;
+}
+
+// Inventory Accuracy weekly bulk paste -- unlike PSDSR, the source tracker only exposes an
+// already-computed percentage per depot (no underlying counted/matched totals), and its own
+// export carries several week columns plus a trailing running-average column rather than one
+// clean pair. Rather than require a specific column count, this always reads the LAST
+// numeric-looking cell on the row as the period's value -- works unchanged whether it's
+// pasted as a simple Depot+Pct pair in future weeks, or straight out of the multi-week
+// rollup (verified against a real export: all 95 depot rows in it matched, using its own
+// trailing "Total Avg" column as the value).
+export function parseInventoryAccuracyPaste(text, depots) {
+  const lines = splitPasteLines(text);
+  const depotIndex = buildDepotIndex(depots);
+  const matchCache = {};
+  function matchCached(depotText) {
+    const key = normalizeDepotName(depotText);
+    if (!(key in matchCache)) matchCache[key] = matchDepotForShop(depotText, depotIndex);
+    return matchCache[key];
+  }
+  const byDepot = {};
+  const unmatchedRows = [];
+  const unmatchedCounts = {};
+  let skipped = 0;
+  lines.forEach((line, idx) => {
+    let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
+    cells = cells.map((c) => c.trim());
+    if (idx === 0 && /^(depot|shop)/i.test(cells[0] || "")) return;
+    const depotText = cells[0] || "";
+    const lastCell = cells[cells.length - 1] || "";
+    let pct = parseFloat(lastCell.replace("%", ""));
+    if (!depotText || Number.isNaN(pct)) { skipped++; return; }
+    pct = Math.max(0, Math.min(100, Math.round(pct * 10) / 10));
+    if (isIndirectChannelShop(depotText)) {
+      unmatchedCounts[depotText] = (unmatchedCounts[depotText] || 0) + 1;
+      unmatchedRows.push({ depotText, pct, reason: "Indirect/partner shop, not a depot" });
+      return;
+    }
+    const code = matchCached(depotText);
+    if (!code) {
+      const key = depotText || "(blank depot)";
+      unmatchedCounts[key] = (unmatchedCounts[key] || 0) + 1;
+      unmatchedRows.push({ depotText, pct, reason: "Not matched to a depot" });
+      return;
+    }
+    byDepot[code] = { pct }; // last row for a depot wins if it appears twice in one paste
+  });
+  return { byDepot, skipped, unmatchedRows, unmatchedCounts };
 }
 
 // Bulk paste for stock movements (transfers/receipts/issues) -- e.g. a waybill/transit

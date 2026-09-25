@@ -121,6 +121,21 @@ export function psdsrStatsForScope(data, scope) {
   return { total, sufficient, depotsReporting, totalDepots: depots.length, pct: total ? Math.round((sufficient / total) * 1000) / 10 : null };
 }
 
+// Inventory Accuracy has no underlying counted/matched totals to weight by (the source
+// tracker only carries the already-computed percentage) -- the scope figure is a plain
+// average across the depots that have an entry, not a weighted rollup like PSDSR's.
+export function inventoryAccuracyStatsForScope(data, scope) {
+  const depots = depotsForScope(data.depots, scope);
+  let sum = 0, depotsReporting = 0;
+  depots.forEach((d) => {
+    const row = data.inventoryAccuracyByDepot[d.code];
+    if (!row) return;
+    sum += row.pct;
+    depotsReporting++;
+  });
+  return { depotsReporting, totalDepots: depots.length, pct: depotsReporting ? Math.round((sum / depotsReporting) * 10) / 10 : null };
+}
+
 // Flattens overviewStats() into the plain numeric shape stored in kpi_snapshots.metrics --
 // exactly the fields the National page's KPI cards need for their value/badge/delta/
 // sparkline, nothing else. haltedCount is passed in separately since overviewStats() doesn't

@@ -147,6 +147,10 @@ function DevicesTab({ rec, canWrite }) {
           React.createElement(KpiTile, {
             label: "PSDSR", value: psdsrPct(data.psdsrByDepot[rec.code]) === null ? "—" : psdsrPct(data.psdsrByDepot[rec.code]) + "%",
             foot: data.psdsrByDepot[rec.code] ? fmtDateShort(data.psdsrByDepot[rec.code].periodDate) : "no entry yet",
+          }),
+          React.createElement(KpiTile, {
+            label: "Inventory Accuracy", value: data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct + "%" : "—",
+            foot: data.inventoryAccuracyByDepot[rec.code] ? fmtDateShort(data.inventoryAccuracyByDepot[rec.code].periodDate) : "no entry yet",
           })),
         React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 10, gap: 8 } },
           React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("ledger", { depotCode: rec.code }) }, "Open device ledger →")),
