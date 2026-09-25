@@ -8,7 +8,7 @@ import { ledgerDevices, depotStockTotals, latestSubmissionForDepot } from "../li
 import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
   SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
-  fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices, trueAgePct, psdsrPct,
+  fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices, trueAgePct, psdsrPct, computeScScore,
   groupDevicesByTier, downloadCsv, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED,
 } from "../lib/domain.js";
 
@@ -72,11 +72,9 @@ function DevicesTab({ rec, canWrite }) {
   const [scName, setScName] = React.useState(rec.scName);
   const [scPhone, setScPhone] = React.useState(rec.scPhone);
   const [scStatus, setScStatus] = React.useState(rec.scStatus);
-  const [scScore, setScScore] = React.useState(rec.scScore === null ? "" : String(rec.scScore));
   const [scNotes, setScNotes] = React.useState(rec.scNotes);
   function saveSc() {
-    const scoreVal = scScore.trim() === "" ? null : Math.max(0, Math.min(100, Number(scScore)));
-    runAction(() => data.saveDepotField(rec.code, { scName: scName.trim(), scPhone: scPhone.trim(), scStatus, scScore: scoreVal, scNotes: scNotes.trim() }), "Saved");
+    runAction(() => data.saveDepotField(rec.code, { scName: scName.trim(), scPhone: scPhone.trim(), scStatus, scNotes: scNotes.trim() }), "Saved");
   }
 
   const balances = data.stockBalances[rec.code] || {};
@@ -98,9 +96,7 @@ function DevicesTab({ rec, canWrite }) {
         React.createElement("div", { className: "field-grid" },
           React.createElement(FieldInput, { label: "Name", value: scName, onChange: setScName }),
           React.createElement(FieldInput, { label: "Phone", value: scPhone, onChange: setScPhone })),
-        React.createElement("div", { className: "field-grid" },
-          React.createElement(FieldSelect, { label: "Status", value: scStatus, onChange: setScStatus, options: [["active", "Active"], ["leave", "On Leave"], ["vacant", "Vacant"]] }),
-          React.createElement(FieldInput, { label: "Score (0–100)", value: scScore, onChange: setScScore, type: "number" })),
+        React.createElement(FieldSelect, { label: "Status", value: scStatus, onChange: setScStatus, options: [["active", "Active"], ["leave", "On Leave"], ["vacant", "Vacant"]] }),
         React.createElement(FieldTextarea, { label: "Notes", value: scNotes, onChange: setScNotes }),
         canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveSc }, "Save Stock Controller")),
       React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
@@ -151,6 +147,10 @@ function DevicesTab({ rec, canWrite }) {
           React.createElement(KpiTile, {
             label: "Inventory Accuracy", value: data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct + "%" : "—",
             foot: data.inventoryAccuracyByDepot[rec.code] ? fmtDateShort(data.inventoryAccuracyByDepot[rec.code].periodDate) : "no entry yet",
+          }),
+          React.createElement(KpiTile, {
+            label: "SC Score", value: computeScScore({ trueAgePctVal: trueAgePct(counts), psdsrRow: data.psdsrByDepot[rec.code], inventoryAccuracyRow: data.inventoryAccuracyByDepot[rec.code] }) ?? "—",
+            foot: "True Age 30 + PSDSR 35 + Inventory 20 + Quiz 15",
           })),
         React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 10, gap: 8 } },
           React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("ledger", { depotCode: rec.code }) }, "Open device ledger →")),

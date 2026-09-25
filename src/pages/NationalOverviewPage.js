@@ -5,7 +5,7 @@ import { KpiTile, KpiCard, EmptyRow } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { REGION_ORDER, fmtNum, groupDevicesByAgent, countsForDevices, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
-import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope } from "../lib/selectors.js";
+import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
 const SNAPSHOT_RANGE_DAYS = 14;
@@ -71,11 +71,13 @@ export function NationalOverviewPage() {
   // banner, agents table) always reflects live current data regardless of the picker.
   const psdsr = psdsrStatsForScope(data, "national");
   const invAcc = inventoryAccuracyStatsForScope(data, "national");
+  const scScore = scScoreStatsForScope(data, "national");
   const liveMetrics = React.useMemo(() => ({
     ...snapshotMetricsFromStats(stats, haltedDepots.length),
     psdsrPct: psdsr.pct, psdsrTotal: psdsr.total, psdsrSufficient: psdsr.sufficient, psdsrDepotsReporting: psdsr.depotsReporting,
     inventoryAccuracyPct: invAcc.pct, inventoryAccuracyDepotsReporting: invAcc.depotsReporting,
-  }), [stats, haltedDepots.length, psdsr, invAcc]);
+    scScoreAvg: scScore.avg, scScoreDepotsScored: scScore.depotsScored,
+  }), [stats, haltedDepots.length, psdsr, invAcc, scScore]);
   const [viewDate, setViewDate] = React.useState(todayStr());
   const isToday = viewDate === todayStr();
   const [rangeSnapshots, setRangeSnapshots] = React.useState([]);
@@ -175,6 +177,7 @@ export function NationalOverviewPage() {
       React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: dm ? fmtNum(dm.psdsrDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("psdsrPct") }),
       React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: dm ? fmtNum(dm.inventoryAccuracyDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("inventoryAccuracyPct") }),
+      React.createElement(KpiCard, { label: "SC Score", value: dm && dm.scScoreAvg !== null ? dm.scScoreAvg : "—", foot: dm ? fmtNum(dm.scScoreDepotsScored) + "/" + fmtNum(stats.activeDepots) + " depots scored" : "", ...cardExtras("scScoreAvg") }),
       React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold this week" : "", ...cardExtras("fifoPct") }),
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiCard, { label: "Active Depots", value: dm ? fmtNum(dm.activeDepots) : "—", foot: dm ? (dm.totalDepots - dm.activeDepots) + " closed" : "", ...cardExtras("activeDepots") }),

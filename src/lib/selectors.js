@@ -1,5 +1,5 @@
 "use strict";
-import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct } from "./domain.js";
+import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct, computeScScore } from "./domain.js";
 import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
@@ -134,6 +134,26 @@ export function inventoryAccuracyStatsForScope(data, scope) {
     depotsReporting++;
   });
   return { depotsReporting, totalDepots: depots.length, pct: depotsReporting ? Math.round((sum / depotsReporting) * 10) / 10 : null };
+}
+
+// Average computed SC Score across a scope's depots -- only over depots that actually have
+// both a PSDSR and an Inventory Accuracy entry (computeScScore returns null otherwise), same
+// "don't silently score what hasn't been reported yet" rule as the score itself.
+export function scScoreStatsForScope(data, scope) {
+  const depots = depotsForScope(data.depots, scope);
+  let sum = 0, depotsScored = 0;
+  depots.forEach((d) => {
+    const ledgerCounts = countsForDevices(ledgerDevices(data.deviceLedger, d.code));
+    const score = computeScScore({
+      trueAgePctVal: trueAgePct(ledgerCounts),
+      psdsrRow: data.psdsrByDepot[d.code],
+      inventoryAccuracyRow: data.inventoryAccuracyByDepot[d.code],
+    });
+    if (score === null) return;
+    sum += score;
+    depotsScored++;
+  });
+  return { depotsScored, totalDepots: depots.length, avg: depotsScored ? Math.round((sum / depotsScored) * 10) / 10 : null };
 }
 
 // Flattens overviewStats() into the plain numeric shape stored in kpi_snapshots.metrics --

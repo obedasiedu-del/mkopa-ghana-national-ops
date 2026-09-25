@@ -89,6 +89,43 @@ export function kpiDeltaText(diff, isPct, days) {
   const mag = Math.abs(rounded) + (isPct ? "pp" : "");
   return arrow + " " + mag + " vs " + days + "d ago";
 }
+
+// SC Scorecard weights, from the original approved spec (weights sum to 100; Scanning and
+// Training are separate deductions on top, not part of the 100). Quiz has no data source
+// yet -- everyone gets full marks for it until real quiz data exists (explicit direction).
+// Scanning/Training deductions have no data source either, so they default to "not missed"
+// (0 deduction) for the same reason -- assume compliant until there's real data saying
+// otherwise, rather than silently penalizing every depot for something nobody has entered.
+export const SC_SCORE_WEIGHTS = { trueAge: 30, psdsr: 35, inventoryAccuracy: 20, quiz: 15 };
+export const SC_SCORE_QUIZ_DEFAULT_PCT = 100; // full marks for everyone, until Quiz exists
+export const SC_SCORE_SCANNING_DEDUCTION = 0; // no data source yet -- assume not missed
+export const SC_SCORE_TRAINING_DEDUCTION = 0; // no data source yet -- assume not missed
+// One component's contribution to the 100-point score: full weight at (or better than) its
+// target, scaled proportionally short of it, capped at the weight either way (overshooting a
+// target doesn't earn extra points beyond that component's share). `higherIsBetter` picks
+// which side of the ratio the shortfall is measured from -- True Age is the only "lower is
+// better" component (its target is a ceiling, not a floor).
+function scoreComponent(value, target, weight, higherIsBetter) {
+  if (value === null || value === undefined || !target) return null;
+  if (higherIsBetter) return Math.max(0, Math.min(weight, weight * (value / target)));
+  if (value <= 0) return weight;
+  return Math.max(0, Math.min(weight, weight * (target / value)));
+}
+// The overall SC Score: null (shown as "—") until this depot actually has both a PSDSR and
+// an Inventory Accuracy entry on file -- True Age is always computable, but a depot nobody
+// has uploaded PSDSR/Inventory data for yet shouldn't silently score as if it had failed
+// those components.
+export function computeScScore({ trueAgePctVal, psdsrRow, inventoryAccuracyRow }) {
+  const psdsrPctVal = psdsrPct(psdsrRow);
+  const invAccPctVal = inventoryAccuracyRow ? inventoryAccuracyRow.pct : null;
+  if (trueAgePctVal === null || psdsrPctVal === null || invAccPctVal === null) return null;
+  const trueAgeScore = scoreComponent(trueAgePctVal, KPI_TARGETS.trueAgePct.max, SC_SCORE_WEIGHTS.trueAge, false);
+  const psdsrScore = scoreComponent(psdsrPctVal, KPI_TARGETS.psdsrPct.min, SC_SCORE_WEIGHTS.psdsr, true);
+  const invAccScore = scoreComponent(invAccPctVal, KPI_TARGETS.inventoryAccuracyPct.min, SC_SCORE_WEIGHTS.inventoryAccuracy, true);
+  const quizScore = SC_SCORE_WEIGHTS.quiz * (SC_SCORE_QUIZ_DEFAULT_PCT / 100);
+  const total = trueAgeScore + psdsrScore + invAccScore + quizScore - SC_SCORE_SCANNING_DEDUCTION - SC_SCORE_TRAINING_DEDUCTION;
+  return Math.round(Math.max(0, Math.min(100, total)) * 10) / 10;
+}
 export function todayStr() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
