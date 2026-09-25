@@ -166,6 +166,7 @@ export function NationalOverviewPage() {
       React.createElement(KpiCard, { label: "Daily Submission Status", value: dm ? dm.submittedToday + "/" + dm.expectedSubmissions : "—", foot: "depots with today's entry", ...cardExtras("submissionPct") }),
       userIsAdmin && React.createElement(KpiCard, { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", ...cardExtras("agedPct") }),
       React.createElement(KpiCard, { label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—", foot: "halt-policy threshold", ...cardExtras("aged14Total") }),
+      React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
       React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold this week" : "", ...cardExtras("fifoPct") }),
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiCard, { label: "Active Depots", value: dm ? fmtNum(dm.activeDepots) : "—", foot: dm ? (dm.totalDepots - dm.activeDepots) + " closed" : "", ...cardExtras("activeDepots") }),

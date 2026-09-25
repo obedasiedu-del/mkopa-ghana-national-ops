@@ -8,7 +8,7 @@ import { ledgerDevices, depotStockTotals, latestSubmissionForDepot } from "../li
 import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
   SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
-  fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices,
+  fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices, trueAgePct,
   groupDevicesByTier, downloadCsv, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED,
 } from "../lib/domain.js";
 
@@ -142,7 +142,8 @@ function DevicesTab({ rec, canWrite }) {
           React.createElement(KpiTile, { label: "Devices tracked", value: fmtNum(counts.total), foot: "with a DSR or resolved" }),
           React.createElement(KpiTile, { label: "Fresh (0–9d)", value: fmtNum(counts.fresh), foot: "on track" }),
           React.createElement(KpiTile, { label: "Aged (10+d)", value: fmtNum(counts.aged + counts.urgent), foot: "needs attention" }),
-          React.createElement(KpiTile, { label: "14+ Days", value: fmtNum(counts.urgent), foot: "escalate now" })),
+          React.createElement(KpiTile, { label: "14+ Days", value: fmtNum(counts.urgent), foot: "escalate now" }),
+          React.createElement(KpiTile, { label: "True Age", value: trueAgePct(counts) === null ? "—" : trueAgePct(counts) + "%", foot: "14d+ share of active (in-trade) stock" })),
         React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 10, gap: 8 } },
           React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("ledger", { depotCode: rec.code }) }, "Open device ledger →")),
         ledgerDvs.length === 0

@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { ScStatusPill, ScoreCell } from "./ui.js";
 import { DataTable } from "./DataTable.js";
 import { ledgerDevices, latestSubmissionForDepot } from "../lib/selectors.js";
-import { countsForDevices, submissionTotals, fmtNum } from "../lib/domain.js";
+import { countsForDevices, submissionTotals, fmtNum, trueAgePct } from "../lib/domain.js";
 
 // Region-level view of the same per-depot device/aging figures the depot page itself shows
 // (Devices at Depot from the daily submission, 14+ Days from the device ledger) -- without
@@ -32,6 +32,10 @@ const COLUMNS = [
     key: "aged14", label: "Aged (14+d)", sortable: true, numeric: true,
     sortValue: (d) => d._aged14, render: (d) => React.createElement("span", { style: d._aged14 > 0 ? { color: "var(--critical)", fontWeight: 600 } : undefined }, fmtNum(d._aged14)),
   },
+  {
+    key: "trueAge", label: "True Age", sortable: true, numeric: true,
+    sortValue: (d) => d._trueAge ?? -1, render: (d) => (d._trueAge === null ? "—" : d._trueAge + "%"),
+  },
 ];
 
 export function DepotTable({ depots }) {
@@ -40,7 +44,7 @@ export function DepotTable({ depots }) {
   const enriched = React.useMemo(() => depots.map((d) => {
     const latest = latestSubmissionForDepot(data.submissionsByDepot, d.code);
     const ledgerCounts = countsForDevices(ledgerDevices(data.deviceLedger, d.code));
-    return { ...d, _devicesAtDepot: latest ? submissionTotals(latest).totalStock : null, _aged14: ledgerCounts.urgent };
+    return { ...d, _devicesAtDepot: latest ? submissionTotals(latest).totalStock : null, _aged14: ledgerCounts.urgent, _trueAge: trueAgePct(ledgerCounts) };
   }), [depots, data.submissionsByDepot, data.deviceLedger]);
   const filtered = enriched.filter((d) => !q || (d.name + " " + d.code + " " + d.scName).toLowerCase().includes(q));
   return React.createElement(DataTable, {

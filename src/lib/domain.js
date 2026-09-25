@@ -77,7 +77,7 @@ export function kpiBadge(key, value) {
 // isn't confused with a 3-unit swing in a count KPI.
 // Which snapshot metric keys are percentages (drives the "pp" suffix in kpiDeltaText and the
 // axis scale in the sparkline) -- everything else is a plain count.
-export const KPI_PCT_METRICS = { agedPct: true, fifoPct: true, submissionPct: true, scCoveragePct: true };
+export const KPI_PCT_METRICS = { agedPct: true, trueAgePct: true, fifoPct: true, submissionPct: true, scCoveragePct: true };
 export function kpiDeltaText(diff, isPct, days) {
   if (diff === null || diff === undefined || Number.isNaN(diff)) return null;
   const rounded = Math.round(diff * 10) / 10;
@@ -163,18 +163,31 @@ export function isResolvedStatus(status) {
   return status === "reallocated" || status === "returned" || status === "sold";
 }
 // devices: array of {status, allocatedDate, initialAllocatedDate}
+// inTrade = still active stock (not sold/returned/reallocated) -- the correct denominator
+// for any aging PERCENTAGE (True Age, Stock Aging %): a depot's resolved history shouldn't
+// dilute how aged its current active stock actually is. Raw counts (fresh/aged/urgent)
+// already only include in-trade devices; `total` deliberately still counts everything,
+// since callers like the halt policy's allocation bracket need the full history.
 export function countsForDevices(devices) {
-  const counts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
+  const counts = { total: 0, inTrade: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
   devices.forEach((dv) => {
     counts.total++;
     if (isResolvedStatus(dv.status)) {
       counts[dv.status]++;
       return;
     }
+    counts.inTrade++;
     const tier = ledgerTierFor(daysAllocated(agingDate(dv)));
     if (tier) counts[tier.key]++;
   });
   return counts;
+}
+// True Age %: of the devices still actively in trade (not sold/returned/reallocated), what
+// share are 14+ days old -- the exact figure the SC Scorecard's "True Age" component grades
+// on, and reconstructible for any past date the same way FIFO Compliance is (allocation
+// dates are fixed, so "how old was this on date X" never needs a stored snapshot).
+export function trueAgePct(counts) {
+  return counts.inTrade ? Math.round((counts.urgent / counts.inTrade) * 1000) / 10 : null;
 }
 // Counts devices at or past an exact day threshold, independent of the fixed
 // Fresh/Aged/14+ tier boundaries above (those stay as they are -- the Halt Policy phases are

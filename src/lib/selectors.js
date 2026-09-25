@@ -1,5 +1,5 @@
 "use strict";
-import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr } from "./domain.js";
+import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct } from "./domain.js";
 import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
@@ -73,7 +73,7 @@ export function overviewStats(data, scope) {
     deviceTotal += latest ? submissionTotals(latest).totalStock : 0;
   });
   const ledgerDepots = ledgerDepotsForScope(data.depots, scope);
-  let ledgerCounts = { total: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
+  let ledgerCounts = { total: 0, inTrade: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
   let aged10Plus = 0;
   let fifoCohort = 0, fifoSold = 0;
   ledgerDepots.forEach((d) => {
@@ -111,12 +111,15 @@ export function overviewStats(data, scope) {
 // compute halt status itself (haltStatusesForScope does, from a different code path).
 export function snapshotMetricsFromStats(stats, haltedCount) {
   const c = stats.ledgerCounts;
-  const agedPct = c.total ? Math.round((stats.aged10Plus / c.total) * 1000) / 10 : null;
+  // Both % against in-trade devices only (sold/returned/reallocated excluded from the
+  // denominator, same as they're excluded from the aged count itself) -- see
+  // domain.js:countsForDevices / trueAgePct.
+  const agedPct = c.inTrade ? Math.round((stats.aged10Plus / c.inTrade) * 1000) / 10 : null;
   const submissionPct = stats.expectedSubmissions ? Math.round((stats.submittedToday / stats.expectedSubmissions) * 1000) / 10 : null;
   const scCoveragePct = stats.activeDepots ? Math.round((stats.scFilled / stats.activeDepots) * 1000) / 10 : null;
   return {
     totalStock: stats.deviceTotal + c.total, deviceTotal: stats.deviceTotal, dsrTotal: c.total,
-    agedPct, agedTotal: stats.aged10Plus, aged14Total: c.urgent,
+    agedPct, agedTotal: stats.aged10Plus, aged14Total: c.urgent, trueAgePct: trueAgePct(c),
     fifoPct: stats.fifoCompliance.pct, fifoCohort: stats.fifoCompliance.cohort, fifoSold: stats.fifoCompliance.sold,
     activeDepots: stats.activeDepots, totalDepots: stats.totalDepots,
     scFilled: stats.scFilled, scVacant: stats.scVacant, scCoveragePct,
