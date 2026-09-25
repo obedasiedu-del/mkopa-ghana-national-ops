@@ -4,6 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { Modal, FieldInput } from "../components/ui.js";
 import { depotsForScope } from "../lib/selectors.js";
 import { parseInventoryAccuracyPaste, downloadCsv, todayStr } from "../lib/domain.js";
+import { readWorkbook, guessInventoryAccuracySheet, readInventoryAccuracySheet } from "../lib/xlsxImport.js";
 
 // Weekly Inventory Accuracy bulk paste -- one row per depot, depot text followed by any
 // number of columns; the LAST cell on each row is read as the period's accuracy %. This
@@ -21,6 +22,11 @@ export function BulkInventoryAccuracyModal() {
   const [summary, setSummary] = React.useState(null);
   const [parsing, setParsing] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [workbook, setWorkbook] = React.useState(null);
+  const [sheetName, setSheetName] = React.useState("");
+  const [fileInfo, setFileInfo] = React.useState(null);
+  const [fileError, setFileError] = React.useState(null);
+  const [readingFile, setReadingFile] = React.useState(false);
   const parseTimerRef = React.useRef(null);
   function scheduleParse(value) {
     setParsing(true);
@@ -31,7 +37,46 @@ export function BulkInventoryAccuracyModal() {
       setParsing(false);
     }, 200);
   }
-  function onChange(e) { const value = e.target.value; setText(value); scheduleParse(value); }
+  function onChange(e) {
+    const value = e.target.value;
+    setText(value); scheduleParse(value);
+    setWorkbook(null); setSheetName(""); setFileInfo(null); setFileError(null);
+  }
+  function loadSheet(wb, name) {
+    try {
+      const result = readInventoryAccuracySheet(wb, name);
+      const joined = result.textRows.join("\n");
+      setText(joined); scheduleParse(joined);
+      setFileInfo({ totalRows: result.totalRows });
+      setFileError(null);
+    } catch (e) {
+      setFileError(e.message || String(e));
+      setFileInfo(null);
+    }
+  }
+  async function onFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setReadingFile(true);
+    setFileError(null);
+    try {
+      const wb = await readWorkbook(file);
+      const guessed = guessInventoryAccuracySheet(wb);
+      setWorkbook(wb);
+      setSheetName(guessed);
+      loadSheet(wb, guessed);
+    } catch (err) {
+      setFileError("Couldn't read that file: " + (err.message || String(err)));
+      setWorkbook(null);
+    } finally {
+      setReadingFile(false);
+    }
+  }
+  function onSheetChange(e) {
+    const name = e.target.value;
+    setSheetName(name);
+    if (workbook) loadSheet(workbook, name);
+  }
   function save() {
     if (!enteredBy.trim()) { toast("Your name is required"); return; }
     if (!periodDate) { toast("A week/period date is required"); return; }
@@ -59,9 +104,17 @@ export function BulkInventoryAccuracyModal() {
     !depotsLoaded && React.createElement("div", { className: "banner", style: { marginBottom: 10 } },
       React.createElement("span", null, "⚠"),
       React.createElement("div", null, "The depot list hasn't finished loading yet — pasting now would match nothing. Close this, wait a couple seconds, then reopen.")),
-    React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-muted)", marginBottom: 10 } }, "Paste rows straight from the weekly tracker — Depot, then any number of columns; the LAST column on each row is read as this period's accuracy %. Works with the full multi-week export (Depot | Week1 | Week2 | Week3 | Week4 | Total Avg) as-is, or a simple Depot + Percent pair. Re-pasting the same period below overwrites that depot's entry for the week, it does not add to it."),
+    React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-muted)", marginBottom: 10 } }, "Upload the weekly Inventory export directly, or paste rows — Depot, then any number of columns; the LAST column on each row is read as this period's accuracy %. Works with the full multi-week rollup (Depot | Week1 | Week2 | Week3 | Week4 | Total Avg) as-is, or a simple Depot + Percent pair. Region subtotal rows and indirect-channel/partner shops will show up as unmatched below — that's expected, not an error, they aren't depots. Re-pasting/re-uploading the same period below overwrites that depot's entry for the week, it does not add to it."),
     React.createElement("div", { className: "field-row" },
-      React.createElement("div", { className: "field-label" }, "Paste Inventory Accuracy rows (all depots)"),
+      React.createElement("div", { className: "field-label" }, "Upload Excel file (.xlsx)"),
+      React.createElement("input", { type: "file", accept: ".xlsx,.xls", onChange: onFileChange, disabled: readingFile }),
+      workbook && workbook.SheetNames.length > 1 && React.createElement("select", { className: "field-input", style: { marginTop: 6, maxWidth: 320 }, value: sheetName, onChange: onSheetChange },
+        workbook.SheetNames.map((n) => React.createElement("option", { key: n, value: n }, n))),
+      readingFile && React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginTop: 4 } }, "Reading file…"),
+      fileError && React.createElement("div", { style: { fontSize: 12, color: "var(--critical)", marginTop: 4 } }, fileError),
+      fileInfo && React.createElement("div", { style: { fontSize: 12, marginTop: 4, color: "var(--success)" } }, fileInfo.totalRows, " rows read from the file.")),
+    React.createElement("div", { className: "field-row" },
+      React.createElement("div", { className: "field-label" }, "…or paste rows (all depots)"),
       React.createElement("textarea", { className: "field-input", rows: 10, placeholder: "Kasoa Depot\t100%\nLapaz Depot\t100%\t100%\t100.00%\t100.00%\t100.00%", value: text, onChange })),
     React.createElement("div", { className: "field-grid" },
       React.createElement(FieldInput, { label: "Entered by (your name)", value: enteredBy, onChange: setEnteredBy }),

@@ -125,6 +125,40 @@ export function readPsdsrSheet(wb, sheetName) {
   return { textRows, totalRows };
 }
 
+// Inventory Accuracy has no fixed column layout to sniff for -- the paste parser only cares
+// about the first cell (depot) and the last cell (a percentage) on each row, whatever's
+// between them. Reads each cell's Excel-DISPLAYED text (cell.w, e.g. "100%") rather than its
+// raw value: a genuine percent-formatted cell's raw value is the underlying fraction (1 for
+// 100%), which would silently read as 1% instead of 100% if used directly -- the displayed
+// string already has the right scale baked in, whatever the cell's underlying format (a
+// percent-formatted number, a plain number, or already-text like "100%").
+export function guessInventoryAccuracySheet(wb) {
+  const byName = wb.SheetNames.find((n) => /inventory/i.test(n));
+  return byName || wb.SheetNames[0];
+}
+export function readInventoryAccuracySheet(wb, sheetName) {
+  const ws = wb.Sheets[sheetName];
+  const ref = ws["!ref"];
+  if (!ref) return { textRows: [], totalRows: 0 };
+  const range = XLSX.utils.decode_range(ref);
+  const textRows = [];
+  let totalRows = 0;
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    const rowCells = [];
+    let firstCell = "";
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c })];
+      const text = cell ? String(cell.w !== undefined ? cell.w : (cell.v !== undefined ? cell.v : "")) : "";
+      rowCells.push(text.replace(/\t/g, " "));
+      if (c === range.s.c) firstCell = text;
+    }
+    if (!firstCell.trim()) continue; // skip blank-first-cell rows (spacer rows, etc.)
+    totalRows++;
+    textRows.push(rowCells.join("\t"));
+  }
+  return { textRows, totalRows };
+}
+
 function excelSerialToDate(serial) {
   return new Date(Math.round((serial - 25569) * 86400000));
 }
