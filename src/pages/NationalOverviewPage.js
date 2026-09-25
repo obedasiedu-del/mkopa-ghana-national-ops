@@ -1,7 +1,6 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { GhanaMap } from "../components/GhanaMap.js";
 import { KpiTile, KpiCard, EmptyRow } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
@@ -58,7 +57,6 @@ function IndirectChannelCard() {
 
 export function NationalOverviewPage() {
   const { data, auth, openModal, goMovements, goAudit, goHalts } = useApp();
-  const [view, setView] = React.useState("map");
   const stats = overviewStats(data, "national");
   const c = stats.ledgerCounts;
   const wh = stats.warehousePendingCounts;
@@ -184,12 +182,8 @@ export function NationalOverviewPage() {
       STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
         React.createElement(MovementTrendChart, { points: trendPoints }))),
-    React.createElement("div", { className: "section-heading-row" },
-      React.createElement("div", { className: "section-heading" }, "Regions"),
-      React.createElement("div", { className: "view-toggle" },
-        React.createElement("button", { className: view === "map" ? "active" : "", onClick: () => setView("map") }, "Map"),
-        React.createElement("button", { className: view === "cards" ? "active" : "", onClick: () => setView("cards") }, "Cards"))),
-    view === "map" ? React.createElement(GhanaMap, null) : React.createElement("div", { className: "territory-grid" }, REGION_ORDER.map((r) => React.createElement(RegionCard, { key: r, region: r }))),
+    React.createElement("div", { className: "section-heading" }, "Regions"),
+    React.createElement("div", { className: "territory-grid" }, REGION_ORDER.map((r) => React.createElement(RegionCard, { key: r, region: r }))),
     React.createElement("div", { className: "section-heading", style: { marginTop: 18 } }, "Other Channels"),
     React.createElement("div", { className: "territory-grid", style: { marginBottom: 22 } }, React.createElement(IndirectChannelCard, null)),
     userIsAdmin && React.createElement(React.Fragment, null,
