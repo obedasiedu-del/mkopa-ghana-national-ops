@@ -9,15 +9,15 @@ import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
   SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
   fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices,
-  groupDevicesByTier, downloadCsv,
+  groupDevicesByTier, downloadCsv, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED,
 } from "../lib/domain.js";
 
 const DEPOT_TABS = [
   { id: "devices", label: "Devices" },
   { id: "submission", label: "Daily Submission" },
-  { id: "movement", label: "Stock Movement" },
+  ...(STOCK_MOVEMENT_ENABLED ? [{ id: "movement", label: "Stock Movement" }] : []),
   { id: "aging", label: "Stock Aging" },
-  { id: "warehouse", label: "Warehouse Stock" },
+  ...(WAREHOUSE_PENDING_ENABLED ? [{ id: "warehouse", label: "Warehouse Stock" }] : []),
   { id: "audit", label: "Audit History" },
 ];
 

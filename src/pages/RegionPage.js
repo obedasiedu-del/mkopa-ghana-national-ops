@@ -5,7 +5,7 @@ import { DepotTable } from "../components/DepotTable.js";
 import { KpiTile, Breadcrumb } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
-import { fmtNum, REGION_ORDER } from "../lib/domain.js";
+import { fmtNum, REGION_ORDER, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED } from "../lib/domain.js";
 import { depotsForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope } from "../lib/selectors.js";
 
 export function RegionPage() {
@@ -30,6 +30,7 @@ export function RegionPage() {
 
   const [movements7d, setMovements7d] = React.useState(null);
   React.useEffect(() => {
+    if (!STOCK_MOVEMENT_ENABLED) return;
     const since = new Date(Date.now() - 7 * 86400000).toISOString();
     data.fetchMovementCount({ depotCodes: depots.map((d) => d.code), sinceIso: since }).then(setMovements7d).catch(() => setMovements7d(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -38,6 +39,7 @@ export function RegionPage() {
   const TREND_DAYS = 14;
   const [trendPoints, setTrendPoints] = React.useState(null);
   React.useEffect(() => {
+    if (!STOCK_MOVEMENT_ENABLED) return;
     const since = new Date(Date.now() - TREND_DAYS * 86400000).toISOString();
     data.fetchMovements({ depotCodes: depots.map((d) => d.code), sinceIso: since, limit: 2000 }).then((rows) => setTrendPoints(bucketMovementsByDay(rows, TREND_DAYS))).catch(() => setTrendPoints([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,23 +61,23 @@ export function RegionPage() {
       React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),
       React.createElement(KpiTile, { label: "Devices at Depots", value: fmtNum(stats.deviceTotal), foot: "from daily submissions" }),
       React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level" }),
-      React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
+      WAREHOUSE_PENDING_ENABLED && React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
       React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
       React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
       React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
-      React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
+      STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiTile, { label: "Active Depots", value: fmtNum(stats.activeDepots), foot: (stats.totalDepots - stats.activeDepots) + " closed" }),
       React.createElement(KpiTile, { label: "SC Coverage", value: stats.scFilled + "/" + stats.activeDepots, foot: stats.scVacant + " vacant" }),
       React.createElement(KpiTile, { label: "Allocation Halts", value: fmtNum(haltedDepots.length), foot: haltPhase ? haltPhase.label + " active" : "policy not started" })),
     React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } },
-      React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements(region) }, "View Stock Movement Log →"),
+      STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements(region) }, "View Stock Movement Log →"),
       React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit(region) }, "View Audit History →"),
       React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts(region) }, "View Halt Status Report →")),
     React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
       React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Aging Distribution"),
         React.createElement(AgingBarChart, { counts: c })),
-      React.createElement("div", null,
+      STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
         React.createElement(MovementTrendChart, { points: trendPoints }))),
     React.createElement("div", { className: "section-heading", style: { marginTop: 14 } }, "Depots in ", region),

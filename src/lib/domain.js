@@ -9,6 +9,14 @@ export const DEVICE_MODEL_SUGGESTIONS = ["A06", "A07", "A16", "A17"];
 export const SUBMISSION_MODELS = ["A07/64", "A07/128", "A16/128", "A17/128", "A17/256"];
 export const SUBMISSION_HISTORY_CAP = 60;
 export const HIGH_AGING_THRESHOLD = 30;
+// Temporarily off while the warehouse_pending_stock data (grown to 70,000+ rows, ~12x the
+// device ledger) is investigated -- flip back to true to restore the KPI tile, Upload
+// button, and Warehouse Stock tab, and re-add it to the eager load in useAppData.js.
+export const WAREHOUSE_PENDING_ENABLED = false;
+// Temporarily off (paused alongside WAREHOUSE_PENDING_ENABLED, at the same request) -- hides
+// the Stock Movement KPI tile, trend chart, and "View Stock Movement Log" link on the
+// National/Region dashboards. Depot-level movement recording is untouched.
+export const STOCK_MOVEMENT_ENABLED = false;
 export const INDIRECT_DEPOT = { code: "INDIRECT", name: "Indirect Channel (All Shops)", region: "National", status: "active" };
 export const UNRECOGNISED_DEPOT = { code: "UNRECOGNISED", name: "Unrecognised Shops", region: "National", status: "active" };
 // Non-depot supply-chain locations that show up as transfer sources/destinations in stock

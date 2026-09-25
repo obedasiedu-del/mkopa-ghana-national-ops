@@ -1,14 +1,16 @@
 "use strict";
 import React from "react";
 import { supabaseClient } from "../supabaseClient.js";
-import { PSEUDO_CODES } from "../lib/domain.js";
+import { PSEUDO_CODES, WAREHOUSE_PENDING_ENABLED } from "../lib/domain.js";
 
 const PAGE_SIZE = 1000;
+// How many pages of one table are ever in flight at once. warehouse_pending_stock alone is
+// 70,000+ rows (70+ pages) -- firing all of those at once (no cap) hits Supabase's
+// connection pooler hard enough to start failing under load, which is worse than the
+// original one-at-a-time fetch it was meant to replace. A bounded batch keeps the big win
+// (70+ sequential round trips collapse to ~9 batches) without overwhelming the pooler.
+const FETCH_CONCURRENCY = 8;
 
-// Pages are fetched in parallel (not one at a time) -- warehouse_pending_stock alone is
-// 70,000+ rows (70+ pages at PAGE_SIZE=1000), and awaiting each page before starting the
-// next turned every login into 70+ sequential round trips just for that one table. A cheap
-// head-count up front tells us how many pages exist, then every page request fires at once.
 function buildPageQuery(table, orderCol, from) {
   let q = supabaseClient.from(table).select("*").range(from, from + PAGE_SIZE - 1);
   if (orderCol) q = q.order(orderCol, { ascending: true });
@@ -20,14 +22,14 @@ async function fetchAll(table, orderCol) {
   const total = count || 0;
   if (total === 0) return [];
   const pageCount = Math.ceil(total / PAGE_SIZE);
-  const pages = await Promise.all(
-    Array.from({ length: pageCount }, (_, p) => buildPageQuery(table, orderCol, p * PAGE_SIZE))
-  );
-  const all = [];
-  for (const { data, error } of pages) {
+  const pageRows = new Array(pageCount);
+  await runWithConcurrency(Array.from({ length: pageCount }, (_, p) => p), FETCH_CONCURRENCY, async (p) => {
+    const { data, error } = await buildPageQuery(table, orderCol, p * PAGE_SIZE);
     if (error) throw error;
-    if (data) all.push(...data);
-  }
+    pageRows[p] = data || [];
+  });
+  const all = [];
+  for (const rows of pageRows) all.push(...rows);
   return all;
 }
 function chunkArr(arr, size) {
@@ -133,18 +135,36 @@ export function useAppData() {
     setWarehousePending(map);
   }, []);
 
+  // Not every rejection is a plain Error with a .message -- a Postgrest error object with
+  // an empty message, or something that isn't an Error at all, stringifies to the useless
+  // "[object Object]" via template interpolation. Fall back to the object's own fields
+  // (JSON.stringify) before giving up, so the banner always shows something diagnosable.
+  function describeError(e) {
+    if (!e) return "Unknown error";
+    if (typeof e === "string") return e;
+    if (e.message) return e.message + (e.code ? ` (code ${e.code})` : "");
+    try {
+      const s = JSON.stringify(e);
+      if (s && s !== "{}") return s;
+    } catch (_jsonErr) { /* fall through */ }
+    return String(e);
+  }
   // Tags a refresh failure with which table it came from -- Supabase/fetch errors don't
   // self-identify the source, and without this every failure collapses into the same
   // generic message, leaving no way to tell a network drop from an RLS/permission issue
   // from the resulting banner alone.
   function tagSource(name, fn) {
-    return fn().catch((e) => { throw new Error(`[${name}] ${e && e.message ? e.message : e}`); });
+    return fn().catch((e) => { throw new Error(`[${name}] ${describeError(e)}`); });
   }
-  const loadAllTagged = React.useCallback(() => Promise.all([
-    tagSource("depots", refreshDepots), tagSource("stock balances", refreshStockBalances),
-    tagSource("submissions", refreshSubmissions), tagSource("ledger baseline", refreshLedgerBaseline),
-    tagSource("device ledger", refreshDeviceLedger), tagSource("warehouse pending", refreshWarehousePending),
-  ]), [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshWarehousePending]);
+  const loadAllTagged = React.useCallback(() => {
+    const tasks = [
+      tagSource("depots", refreshDepots), tagSource("stock balances", refreshStockBalances),
+      tagSource("submissions", refreshSubmissions), tagSource("ledger baseline", refreshLedgerBaseline),
+      tagSource("device ledger", refreshDeviceLedger),
+    ];
+    if (WAREHOUSE_PENDING_ENABLED) tasks.push(tagSource("warehouse pending", refreshWarehousePending));
+    return Promise.all(tasks);
+  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshWarehousePending]);
   const loadAll = React.useCallback(async () => {
     try {
       setDbError(null);
@@ -176,7 +196,7 @@ export function useAppData() {
   const refreshers = {
     depots: refreshDepots, stock_movements: refreshStockBalances,
     submissions: refreshSubmissions, device_ledger_baseline: refreshLedgerBaseline, device_ledger: refreshDeviceLedger,
-    warehouse_pending_stock: refreshWarehousePending,
+    ...(WAREHOUSE_PENDING_ENABLED ? { warehouse_pending_stock: refreshWarehousePending } : {}),
   };
   React.useEffect(() => {
     const channel = supabaseClient.channel("national-ops-changes");
