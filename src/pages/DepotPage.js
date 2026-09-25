@@ -33,6 +33,7 @@ export function DepotPage() {
   if (!rec) return React.createElement("div", { className: "content" }, "Loading…");
 
   const canWrite = canWriteDepot(auth.role, rec.code, rec.region);
+  const isSC = auth.role && auth.role.role === "depot_controller";
   const haltPhase = activeHaltPhase();
   const haltStatus = haltPhase ? haltStatusForDepot(countsForDevices(ledgerDevices(data.deviceLedger, rec.code)), haltPhase) : null;
 
@@ -42,10 +43,10 @@ export function DepotPage() {
       // region -- its "region" is just the literal string "National" -- so a middle crumb
       // for it would link to a region page that doesn't exist.
       items: rec.isSynthetic
-        ? [{ label: "National", onClick: goNational }, { label: rec.name }]
+        ? [{ label: "National", onClick: isSC ? undefined : goNational }, { label: rec.name }]
         : [
-            { label: "National", onClick: goNational },
-            { label: rec.region, onClick: () => goRegion(rec.region) },
+            { label: "National", onClick: isSC ? undefined : goNational },
+            { label: rec.region, onClick: isSC ? undefined : () => goRegion(rec.region) },
             { label: rec.name },
           ],
     }),
