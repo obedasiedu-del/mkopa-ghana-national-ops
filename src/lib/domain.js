@@ -294,23 +294,6 @@ export function agedSkuBreakdown(devices, threshold = 14) {
   });
   return Object.entries(counts).map(([model, count]) => ({ model, count })).sort((a, b) => b.count - a.count);
 }
-export function groupDevicesByAgent(devices) {
-  const groups = {};
-  devices.forEach((dv) => {
-    const name = (dv.dsrName || "").trim();
-    const key = name || "(No DSR listed)";
-    if (!groups[key]) groups[key] = { name: key, devices: [], depotNames: {} };
-    groups[key].devices.push(dv);
-    groups[key].depotNames[dv.depotName || dv.depotCode] = true;
-  });
-  const list = Object.values(groups);
-  list.sort((a, b) => {
-    if (a.name === "(No DSR listed)") return 1;
-    if (b.name === "(No DSR listed)") return -1;
-    return a.name.localeCompare(b.name);
-  });
-  return list;
-}
 export function groupDevicesByTier(devices) {
   const groups = {};
   LEDGER_TIERS.forEach((t) => { groups[t.key] = []; });

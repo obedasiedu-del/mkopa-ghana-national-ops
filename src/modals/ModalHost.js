@@ -9,7 +9,6 @@ import { BulkDepotStockModal } from "./BulkDepotStockModal.js";
 import { BulkPsdsrModal } from "./BulkPsdsrModal.js";
 import { BulkInventoryAccuracyModal } from "./BulkInventoryAccuracyModal.js";
 import { BulkMovementModal } from "./BulkMovementModal.js";
-import { AgentLedgerModal } from "./AgentLedgerModal.js";
 import { ClearLedgerConfirm } from "./ClearLedgerConfirm.js";
 import { RecordMovementModal } from "./RecordMovementModal.js";
 
@@ -25,7 +24,6 @@ export function ModalHost() {
     case "bulkPsdsr": return React.createElement(BulkPsdsrModal, { ...modal.props });
     case "bulkInventoryAccuracy": return React.createElement(BulkInventoryAccuracyModal, { ...modal.props });
     case "bulkMovement": return React.createElement(BulkMovementModal, { ...modal.props });
-    case "agentLedger": return React.createElement(AgentLedgerModal, { ...modal.props });
     case "clearLedger": return React.createElement(ClearLedgerConfirm, { ...modal.props });
     case "recordMovement": return React.createElement(RecordMovementModal, { ...modal.props });
     default: return null;

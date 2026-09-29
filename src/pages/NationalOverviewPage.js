@@ -1,12 +1,12 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { KpiTile, KpiCard, EmptyRow } from "../components/ui.js";
+import { KpiTile, KpiCard } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
-import { REGION_ORDER, fmtNum, groupDevicesByAgent, countsForDevices, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
+import { REGION_ORDER, fmtNum, countsForDevices, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
 import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
@@ -24,27 +24,6 @@ function RegionCard({ region }) {
       React.createElement("div", null, React.createElement("div", { className: "territory-stat-num" }, stats.activeDepots), React.createElement("div", { className: "territory-stat-label" }, "Depots")),
       React.createElement("div", null, React.createElement("div", { className: "territory-stat-num" }, stats.scFilled, "/", stats.activeDepots), React.createElement("div", { className: "territory-stat-label" }, "SC filled"))),
     React.createElement("div", { className: "territory-bar" }, React.createElement("div", { className: "territory-bar-fill", style: { width: pct + "%" } })));
-}
-
-function AgentsByDsrTable() {
-  const { data, openModal } = useApp();
-  const groups = groupDevicesByAgent(ledgerDevicesForScope(data.deviceLedger, data.depots, "national")).slice(0, 20);
-  return React.createElement("div", { className: "table-wrap table-wrap-scroll" },
-    React.createElement("table", null,
-      React.createElement("thead", null, React.createElement("tr", null,
-        React.createElement("th", null, "Agent / DSR"), React.createElement("th", null, "Depot(s)"),
-        React.createElement("th", { className: "num" }, "Devices"), React.createElement("th", { className: "num" }, "14+ Days"))),
-      React.createElement("tbody", null,
-        groups.length === 0 && React.createElement(EmptyRow, { colSpan: 4 }, "No devices with DSRs on file yet."),
-        groups.map((g) => {
-          const c = countsForDevices(g.devices);
-          const depotNames = Object.keys(g.depotNames);
-          return React.createElement("tr", { key: g.name, className: "clickable", onClick: () => openModal("agentLedger", { group: g, scope: "national" }) },
-            React.createElement("td", null, g.name),
-            React.createElement("td", null, depotNames.length <= 1 ? (depotNames[0] || "—") : depotNames.length + " depots"),
-            React.createElement("td", { className: "num", style: { fontWeight: 600 } }, c.total),
-            React.createElement("td", { className: "num" }, c.urgent));
-        }))));
 }
 
 function IndirectChannelCard() {
@@ -215,7 +194,5 @@ export function NationalOverviewPage() {
           React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkInventoryAccuracy") }, "Upload Inventory Accuracy (All Depots)"),
           WAREHOUSE_PENDING_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkWarehouseStock") }, "Upload Warehouse Stock"),
           React.createElement("button", { className: "btn btn-danger btn-sm", onClick: () => openModal("clearLedger") }, "Clear All Devices"))),
-      React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 14 } }, "Paste a full national device or stock export once — rows are matched to a depot automatically. See each button for column format.")),
-    React.createElement("div", { className: "section-heading" }, "Devices with DSRs — by agent (national)"),
-    React.createElement(AgentsByDsrTable, null));
+      React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 14 } }, "Paste a full national device or stock export once — rows are matched to a depot automatically. See each button for column format.")));
 }
