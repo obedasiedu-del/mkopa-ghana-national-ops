@@ -4,6 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { KpiTile, KpiCard, EmptyRow } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
+import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { REGION_ORDER, fmtNum, groupDevicesByAgent, countsForDevices, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
 import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
@@ -61,6 +62,7 @@ export function NationalOverviewPage() {
   const c = stats.ledgerCounts;
   const wh = stats.warehousePendingCounts;
   const userIsAdmin = isAdmin(auth.role);
+  const nationalDevices = React.useMemo(() => ledgerDevicesForScope(data.deviceLedger, data.depots, "national"), [data.deviceLedger, data.depots]);
 
   const haltStatuses = React.useMemo(() => haltStatusesForScope(data, "national"), [data]);
   const haltedDepots = haltStatuses.filter((s) => s.halted);
@@ -194,7 +196,9 @@ export function NationalOverviewPage() {
       STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
         React.createElement(MovementTrendChart, { points: trendPoints }))),
-    React.createElement("div", { className: "section-heading" }, "Regions"),
+    React.createElement("div", { className: "section-heading" }, "Daily Submission — devices by age, national"),
+    React.createElement(AgingBreakdown, { devices: nationalDevices, showDepotColumn: true }),
+    React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Regions"),
     React.createElement("div", { className: "territory-grid" }, REGION_ORDER.map((r) => React.createElement(RegionCard, { key: r, region: r }))),
     React.createElement("div", { className: "section-heading", style: { marginTop: 18 } }, "Other Channels"),
     React.createElement("div", { className: "territory-grid", style: { marginBottom: 22 } }, React.createElement(IndirectChannelCard, null)),
