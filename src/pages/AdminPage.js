@@ -29,7 +29,19 @@ export function AdminPage() {
   }
 
   const columns = [
-    { key: "email", label: "Email", sortable: true },
+    {
+      key: "email", label: "Name / Email", sortable: true,
+      // A Depot Controller's real name lives on the depot record (Stock Controller name) --
+      // the login itself is often still a placeholder (scXXX@mkopa-ghana-ops.internal) rather
+      // than their personal email, so show the name as the primary line where we have it.
+      render: (u) => {
+        const scName = u.role === "depot_controller" ? (data.depots[u.depotCode] || {}).scName : null;
+        if (!scName) return u.email;
+        return React.createElement("div", null,
+          React.createElement("div", null, scName),
+          React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--text-faint)" } }, u.email));
+      },
+    },
     {
       key: "role", label: "Role", sortable: true, sortValue: (u) => u.role || "",
       render: (u) => u.role ? React.createElement(Pill, { cls: "pill-success" }, ROLE_LABEL[u.role] || u.role) : React.createElement(Pill, { cls: "pill-critical" }, "Pending access"),
