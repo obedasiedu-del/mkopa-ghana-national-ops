@@ -6,12 +6,12 @@ import { depotsForScope, activeDepots } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
 function Sidebar() {
-  const { data, auth, route, goNational, goRegion, goAdmin } = useApp();
+  const { data, auth, route, goNational, goRegion, goAdmin, goDepot } = useApp();
   const isSC = auth.role && auth.role.role === "depot_controller";
   const userIsAdmin = isAdmin(auth.role);
   const allDepots = depotsForScope(data.depots, "national");
   const currentRegion = route.name === "region" ? route.region : (route.name === "depot" && data.depots[route.depotCode] ? data.depots[route.depotCode].region : null);
-  const rec = isSC ? data.depots[auth.role.depotCode] : null;
+  const myDepots = isSC ? (auth.role.depotCodes || []).map((c) => data.depots[c]).filter(Boolean) : [];
   return React.createElement("aside", { className: "sidebar" },
     React.createElement("div", { className: "brand" },
       React.createElement("div", { className: "brand-mark" },
@@ -20,13 +20,19 @@ function Sidebar() {
           React.createElement("div", { className: "brand-title" }, "National Stock Ops"),
           React.createElement("div", { className: "brand-sub" }, "M-KOPA Ghana"))),
     ),
-    // A Stock Controller only ever has one place to be -- her own depot -- so there's
-    // nothing to navigate between; the National/Regions nav (which would otherwise show
-    // RLS-blocked, broken fragments for her) is replaced with just her depot's name.
+    // A Stock Controller only ever has her own depot(s) to navigate between -- almost always
+    // just one, occasionally two for someone who genuinely runs two depots (user_role_depots)
+    // -- so the National/Regions nav (which would otherwise show RLS-blocked, broken fragments
+    // for her) is replaced with just that.
     isSC
       ? React.createElement("div", { className: "nav-section" },
-          React.createElement("div", { className: "nav-label" }, "Your Depot"),
-          React.createElement("div", { className: "nav-item active" }, rec ? rec.name : auth.role.depotCode))
+          React.createElement("div", { className: "nav-label" }, myDepots.length > 1 ? "Your Depots" : "Your Depot"),
+          myDepots.length
+            ? myDepots.map((d) => React.createElement("button", {
+                key: d.code, className: "nav-item" + (route.name === "depot" && route.depotCode === d.code ? " active" : ""),
+                onClick: () => goDepot(d.code),
+              }, d.name))
+            : React.createElement("div", { className: "nav-item active" }, "—"))
       : React.createElement(React.Fragment, null,
           React.createElement("div", { className: "nav-section" },
             React.createElement("div", { className: "nav-label" }, "Scope"),

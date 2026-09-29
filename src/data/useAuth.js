@@ -22,14 +22,19 @@ export function useAuth() {
     const { data, error } = await supabaseClient.from("user_roles").select("*").eq("user_id", userId).maybeSingle();
     if (error) { setRole(null); setRoleLoaded(true); return; }
     if (!data) { setRole(null); setRoleLoaded(true); return; }
-    // A Regional Manager can cover more than one region -- membership lives in
-    // user_role_regions (see the multi-region migration), not the old single region column.
+    // A Regional Manager can cover more than one region, and a Depot Controller more than one
+    // depot -- membership lives in user_role_regions / user_role_depots (see the multi-region
+    // and multi-depot migrations), not the old single region/depot_code columns.
     let regions = [];
+    let depotCodes = [];
     if (data.role === "regional_manager") {
       const { data: regionRows } = await supabaseClient.from("user_role_regions").select("region").eq("user_id", userId);
       regions = (regionRows || []).map((r) => r.region);
+    } else if (data.role === "depot_controller") {
+      const { data: depotRows } = await supabaseClient.from("user_role_depots").select("depot_code").eq("user_id", userId);
+      depotCodes = (depotRows || []).map((r) => r.depot_code);
     }
-    setRole({ role: data.role, regions, depotCode: data.depot_code });
+    setRole({ role: data.role, regions, depotCodes, depotCode: data.depot_code });
     setRoleLoaded(true);
   }, []);
 
@@ -57,7 +62,7 @@ export function canWriteDepot(role, depotCode, depotRegion) {
   if (!role) return false;
   if (role.role === "national_admin") return true;
   if (role.role === "regional_manager") return (role.regions || []).includes(depotRegion);
-  if (role.role === "depot_controller") return role.depotCode === depotCode;
+  if (role.role === "depot_controller") return (role.depotCodes || []).includes(depotCode);
   return false;
 }
 export function isAdmin(role) {

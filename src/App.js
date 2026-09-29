@@ -15,20 +15,21 @@ import { AdminPage } from "./pages/AdminPage.js";
 import { ModalHost } from "./modals/ModalHost.js";
 import { ToastStack } from "./components/ui.js";
 
-// A Stock Controller is confined to her own depot's page -- everything else (National,
+// A Stock Controller is confined to her own depot page(s) -- everything else (National,
 // Region, Search, Movements/Audit/Halts logs) shows nothing but RLS-blocked fragments for
-// her anyway (fn_can_read_depot restricts every underlying table to her own depot_code), so
+// her anyway (fn_can_read_depot restricts every underlying table to her own depot(s)), so
 // letting her land on those pages at all just means broken, confusing partial data rather
-// than an actual leak. This redirects her to her own depot the moment she's anywhere else,
-// including a typed-in URL for a different depot.
+// than an actual leak. Most Stock Controllers run exactly one depot, but a few real people
+// run two (see user_role_depots) -- this redirects her to one of her own depots the moment
+// she's anywhere else, including a typed-in URL for a depot that isn't hers.
 function ScRouter() {
   const { route, auth, goDepot } = useApp();
-  const depotCode = auth.role.depotCode;
-  const onOwnDepot = route.name === "depot" && route.depotCode === depotCode;
+  const depotCodes = auth.role.depotCodes || [];
+  const onOwnDepot = route.name === "depot" && depotCodes.includes(route.depotCode);
   React.useEffect(() => {
-    if (!onOwnDepot && depotCode) goDepot(depotCode);
-  }, [onOwnDepot, depotCode, goDepot]);
-  if (!depotCode) {
+    if (!onOwnDepot && depotCodes.length) goDepot(depotCodes[0]);
+  }, [onOwnDepot, depotCodes, goDepot]);
+  if (!depotCodes.length) {
     return React.createElement("div", { className: "content" },
       React.createElement("div", { className: "banner" }, React.createElement("span", null, "⚠"),
         React.createElement("div", null, "Your account has no depot assigned yet — ask an admin to fix this in User Management.")));

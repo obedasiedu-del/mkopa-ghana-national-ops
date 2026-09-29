@@ -35,7 +35,8 @@ export function AdminPage() {
       // the login itself is often still a placeholder (scXXX@mkopa-ghana-ops.internal) rather
       // than their personal email, so show the name as the primary line where we have it.
       render: (u) => {
-        const scName = u.role === "depot_controller" ? (data.depots[u.depotCode] || {}).scName : null;
+        const firstDepot = u.role === "depot_controller" && u.depotCodes && u.depotCodes.length ? data.depots[u.depotCodes[0]] : null;
+        const scName = firstDepot ? firstDepot.scName : null;
         if (!scName) return u.email;
         return React.createElement("div", null,
           React.createElement("div", null, scName),
@@ -50,8 +51,9 @@ export function AdminPage() {
       key: "scope", label: "Region / Depot",
       render: (u) => u.role === "regional_manager" || u.role === "national_admin"
         ? (u.regions && u.regions.length ? u.regions.join(", ") : "—")
-        : u.role === "depot_controller" ? ((data.depots[u.depotCode] || {}).name || u.depotCode || "—")
-        : "—",
+        : u.role === "depot_controller"
+          ? (u.depotCodes && u.depotCodes.length ? u.depotCodes.map((c) => (data.depots[c] || {}).name || c).join(", ") : "—")
+          : "—",
     },
     {
       key: "actions", label: "",
