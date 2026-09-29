@@ -6,6 +6,7 @@ import { KpiTile, Breadcrumb } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
+import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
 import { fmtNum, REGION_ORDER, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, trueAgePct } from "../lib/domain.js";
 import { depotsForScope, ledgerDevicesForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
@@ -94,7 +95,9 @@ export function RegionPage() {
       STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
         React.createElement(MovementTrendChart, { points: trendPoints }))),
-    React.createElement("div", { className: "section-heading", style: { marginTop: 14 } }, "Daily Submission — devices by age, ", region),
+    React.createElement("div", { className: "section-heading", style: { marginTop: 14 } }, "Daily Submission — ", region),
+    React.createElement(DailySubmissionOverview, { scope: region }),
+    React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, ", region),
     React.createElement(AgingBreakdown, { devices: regionDevices, showDepotColumn: true }),
     React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Depots in ", region),
     React.createElement(DepotTable, { depots }));

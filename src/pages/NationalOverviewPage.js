@@ -5,6 +5,7 @@ import { KpiTile, KpiCard, EmptyRow } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
+import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
 import { REGION_ORDER, fmtNum, groupDevicesByAgent, countsForDevices, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
 import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
@@ -196,7 +197,9 @@ export function NationalOverviewPage() {
       STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
         React.createElement(MovementTrendChart, { points: trendPoints }))),
-    React.createElement("div", { className: "section-heading" }, "Daily Submission — devices by age, national"),
+    React.createElement("div", { className: "section-heading" }, "Daily Submission — national"),
+    React.createElement(DailySubmissionOverview, { scope: "national" }),
+    React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, national"),
     React.createElement(AgingBreakdown, { devices: nationalDevices, showDepotColumn: true }),
     React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Regions"),
     React.createElement("div", { className: "territory-grid" }, REGION_ORDER.map((r) => React.createElement(RegionCard, { key: r, region: r }))),

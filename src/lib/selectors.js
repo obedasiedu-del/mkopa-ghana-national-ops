@@ -1,5 +1,5 @@
 "use strict";
-import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct, computeScScore } from "./domain.js";
+import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct, computeScScore, SUBMISSION_MODELS } from "./domain.js";
 import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
@@ -103,6 +103,68 @@ export function overviewStats(data, scope) {
     deviceTotal, ledgerCounts, aged10Plus, warehousePendingCounts, fifoCompliance,
     submittedToday, expectedSubmissions: active.length,
   };
+}
+
+// Daily Submission = depot-held stock the Stock Controller reports each day, by model, that
+// has NOT yet been handed to a DSR (that's what "Devices at Depot" is, as distinct from the
+// device ledger's "Devices with DSRs"). This rolls up each active depot's *latest* on-file
+// submission for a scope: totals, a by-model breakdown, and one row per depot for a
+// "Depot Performance" table -- the same shape as the standalone Central Region tracker.
+export function submissionLatestStatsForScope(data, scope) {
+  const depots = activeDepots(depotsForScope(data.depots, scope));
+  const bySku = {};
+  SUBMISSION_MODELS.forEach((m) => { bySku[m] = { total: 0, aged: 0 }; });
+  let total = 0, aged = 0, depotsReported = 0;
+  const perDepot = depots.map((d) => {
+    const latest = latestSubmissionForDepot(data.submissionsByDepot, d.code);
+    if (!latest) return { depot: d, latest: null, totals: null, pctAged: null };
+    depotsReported++;
+    const t = submissionTotals(latest);
+    total += t.totalStock;
+    aged += t.agedStock;
+    SUBMISSION_MODELS.forEach((m) => {
+      const row = latest.models && latest.models[m];
+      bySku[m].total += row ? Number(row.totalStock) || 0 : 0;
+      bySku[m].aged += row ? Number(row.agedStock) || 0 : 0;
+    });
+    return { depot: d, latest, totals: t, pctAged: t.totalStock > 0 ? Math.round((t.agedStock / t.totalStock) * 1000) / 10 : 0 };
+  });
+  return {
+    total, aged, pctAged: total > 0 ? Math.round((aged / total) * 1000) / 10 : null,
+    depotsReported, totalDepots: depots.length, bySku, perDepot,
+  };
+}
+// Daily Submission history for a scope, one row per calendar date that has at least one
+// depot's entry -- each row sums every depot that reported that day (by model, and overall),
+// mirroring the Central Region tracker's "Daily Totals" table. Most recent date first.
+export function submissionDailyTotalsForScope(data, scope, maxDays) {
+  const depots = activeDepots(depotsForScope(data.depots, scope));
+  const byDate = {};
+  depots.forEach((d) => {
+    (data.submissionsByDepot[d.code] || []).forEach((entry) => {
+      const bucket = byDate[entry.date] || (byDate[entry.date] = { depotCodes: new Set(), models: {}, total: 0, aged: 0 });
+      bucket.depotCodes.add(d.code);
+      const t = submissionTotals(entry);
+      bucket.total += t.totalStock;
+      bucket.aged += t.agedStock;
+      SUBMISSION_MODELS.forEach((m) => {
+        const row = entry.models && entry.models[m];
+        const cur = bucket.models[m] || (bucket.models[m] = { total: 0, aged: 0 });
+        cur.total += row ? Number(row.totalStock) || 0 : 0;
+        cur.aged += row ? Number(row.agedStock) || 0 : 0;
+      });
+    });
+  });
+  let dates = Object.keys(byDate).sort().reverse();
+  if (maxDays) dates = dates.slice(0, maxDays);
+  return dates.map((date) => {
+    const b = byDate[date];
+    return {
+      date, depotsReporting: b.depotCodes.size, totalDepots: depots.length,
+      models: b.models, total: b.total, aged: b.aged,
+      pctAged: b.total > 0 ? Math.round((b.aged / b.total) * 1000) / 10 : 0,
+    };
+  });
 }
 
 // Rolls up the latest weekly PSDSR entries (data.psdsrByDepot) across a scope's depots --
