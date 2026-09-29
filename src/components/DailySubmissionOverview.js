@@ -14,9 +14,10 @@ const DAILY_TOTALS_DAYS = 14;
 // numbers a Stock Controller enters per depot, matching the standalone Central Region
 // tracker's Daily Totals / By-model / Depot Performance layout.
 export function DailySubmissionOverview({ scope }) {
-  const { data, goDepot } = useApp();
+  const { data } = useApp();
   const latest = React.useMemo(() => submissionLatestStatsForScope(data, scope), [data, scope]);
   const dailyTotals = React.useMemo(() => submissionDailyTotalsForScope(data, scope, DAILY_TOTALS_DAYS), [data, scope]);
+  const [detailOpen, setDetailOpen] = React.useState(false);
 
   const perfColumns = [
     {
@@ -49,27 +50,39 @@ export function DailySubmissionOverview({ scope }) {
         React.createElement("div", { className: "kpi-label" }, m),
         React.createElement("div", { className: "kpi-value" }, fmtNum(latest.bySku[m].total)),
         React.createElement("div", { className: "kpi-foot" }, fmtNum(latest.bySku[m].aged), " aged")))),
-    React.createElement("div", { className: "section-heading" }, "Daily Totals"),
-    dailyTotals.length === 0
-      ? React.createElement("div", { className: "table-wrap", style: { marginBottom: 16 } }, React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No daily submissions on file for this scope yet."))
-      : React.createElement("div", { className: "table-wrap table-wrap-scroll", style: { marginBottom: 16 } },
-        React.createElement("table", null,
-          React.createElement("thead", null, React.createElement("tr", null,
-            React.createElement("th", null, "Date"), React.createElement("th", { className: "num" }, "Depots Reporting"),
-            SUBMISSION_MODELS.map((m) => React.createElement("th", { key: m, className: "num" }, m)),
-            React.createElement("th", { className: "num" }, "Total"), React.createElement("th", { className: "num" }, "Aged"), React.createElement("th", { className: "num" }, "% Aged"))),
-          React.createElement("tbody", null, dailyTotals.map((row) => React.createElement("tr", { key: row.date },
-            React.createElement("td", null, fmtDateShort(row.date)),
-            React.createElement("td", { className: "num" }, row.depotsReporting + "/" + row.totalDepots),
-            SUBMISSION_MODELS.map((m) => React.createElement("td", { key: m, className: "num" }, fmtNum(row.models[m] ? row.models[m].total : 0))),
-            React.createElement("td", { className: "num", style: { fontWeight: 600 } }, fmtNum(row.total)),
-            React.createElement("td", { className: "num" }, fmtNum(row.aged)),
-            React.createElement("td", { className: "num" }, row.pctAged + "%")))))),
-    React.createElement("div", { className: "section-heading" }, "Depot Performance"),
-    React.createElement(DataTable, {
-      columns: perfColumns, rows: latest.perDepot, rowKey: (r) => r.depot.code,
-      onRowClick: (r) => { window.location.hash = "#/depot/" + encodeURIComponent(r.depot.code) + "/submission"; },
-      defaultSortKey: "pctAged", defaultSortDir: "desc",
-      emptyMessage: "No depots in this scope.",
-    }));
+    React.createElement("button", {
+      className: "table-wrap",
+      style: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", textAlign: "left", padding: "14px 16px", cursor: "pointer", marginBottom: detailOpen ? 16 : 0 },
+      onClick: () => setDetailOpen((o) => !o),
+    },
+      React.createElement("div", null,
+        React.createElement("div", { className: "drawer-section-title", style: { marginBottom: 2 } }, "Daily Totals & Depot Performance"),
+        React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)" } },
+          dailyTotals.length, " day", dailyTotals.length === 1 ? "" : "s", " tracked · ", latest.perDepot.length, " depots · ",
+          latest.depotsReported, " reported latest")),
+      React.createElement("span", { style: { fontSize: 12, color: "var(--text-muted)", flexShrink: 0, marginLeft: 12 } }, detailOpen ? "Hide ▲" : "Show ▼")),
+    detailOpen && React.createElement(React.Fragment, null,
+      React.createElement("div", { className: "section-heading" }, "Daily Totals"),
+      dailyTotals.length === 0
+        ? React.createElement("div", { className: "table-wrap", style: { marginBottom: 16 } }, React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No daily submissions on file for this scope yet."))
+        : React.createElement("div", { className: "table-wrap table-wrap-scroll", style: { marginBottom: 16 } },
+          React.createElement("table", null,
+            React.createElement("thead", null, React.createElement("tr", null,
+              React.createElement("th", null, "Date"), React.createElement("th", { className: "num" }, "Depots Reporting"),
+              SUBMISSION_MODELS.map((m) => React.createElement("th", { key: m, className: "num" }, m)),
+              React.createElement("th", { className: "num" }, "Total"), React.createElement("th", { className: "num" }, "Aged"), React.createElement("th", { className: "num" }, "% Aged"))),
+            React.createElement("tbody", null, dailyTotals.map((row) => React.createElement("tr", { key: row.date },
+              React.createElement("td", null, fmtDateShort(row.date)),
+              React.createElement("td", { className: "num" }, row.depotsReporting + "/" + row.totalDepots),
+              SUBMISSION_MODELS.map((m) => React.createElement("td", { key: m, className: "num" }, fmtNum(row.models[m] ? row.models[m].total : 0))),
+              React.createElement("td", { className: "num", style: { fontWeight: 600 } }, fmtNum(row.total)),
+              React.createElement("td", { className: "num" }, fmtNum(row.aged)),
+              React.createElement("td", { className: "num" }, row.pctAged + "%")))))),
+      React.createElement("div", { className: "section-heading" }, "Depot Performance"),
+      React.createElement(DataTable, {
+        columns: perfColumns, rows: latest.perDepot, rowKey: (r) => r.depot.code,
+        onRowClick: (r) => { window.location.hash = "#/depot/" + encodeURIComponent(r.depot.code) + "/submission"; },
+        defaultSortKey: "pctAged", defaultSortDir: "desc",
+        emptyMessage: "No depots in this scope.",
+      })));
 }
