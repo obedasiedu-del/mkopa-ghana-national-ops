@@ -5,6 +5,10 @@ export const REGION_ORDER = [
   "Accra West", "Accra East", "Eastern", "Oti-Volta", "Western", "Central",
   "Bono", "Northern", "Ashanti",
 ];
+// Non-geographic scopes that still get a region-style page (KPIs, Daily Submission rollup,
+// aging breakdown, depot table) -- currently just the Indirect Sales channel, for a Regional
+// Manager whose whole "region" is that one channel rather than a set of real depots.
+export const OTHER_SCOPES = ["Indirect"];
 export const DEVICE_MODEL_SUGGESTIONS = ["A06", "A07", "A16", "A17"];
 export const SUBMISSION_MODELS = ["A07/64", "A07/128", "A16/128", "A17/128", "A17/256"];
 export const SUBMISSION_HISTORY_CAP = 60;

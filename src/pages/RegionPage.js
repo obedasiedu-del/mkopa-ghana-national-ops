@@ -7,14 +7,14 @@ import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
-import { fmtNum, REGION_ORDER, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, trueAgePct } from "../lib/domain.js";
+import { fmtNum, REGION_ORDER, OTHER_SCOPES, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, trueAgePct } from "../lib/domain.js";
 import { depotsForScope, ledgerDevicesForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
 export function RegionPage() {
   const { data, auth, route, search, goNational, goMovements, goAudit, goHalts } = useApp();
   const region = route.region;
-  if (!REGION_ORDER.includes(region)) {
+  if (!REGION_ORDER.includes(region) && !OTHER_SCOPES.includes(region)) {
     return React.createElement("div", { className: "content" },
       React.createElement("div", { className: "banner" }, React.createElement("span", null, "⚠"), React.createElement("div", null, "Unknown region \"" + region + "\".")));
   }

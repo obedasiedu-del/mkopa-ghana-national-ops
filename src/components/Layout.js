@@ -1,7 +1,7 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { REGION_ORDER, USER_ROLES } from "../lib/domain.js";
+import { REGION_ORDER, OTHER_SCOPES, USER_ROLES } from "../lib/domain.js";
 import { depotsForScope, activeDepots } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
@@ -32,12 +32,19 @@ function Sidebar() {
             React.createElement("div", { className: "nav-label" }, "Scope"),
             React.createElement("button", { className: "nav-item" + (route.name === "national" ? " active" : ""), onClick: goNational },
               "National ", React.createElement("span", { className: "count" }, activeDepots(allDepots).length))),
-          React.createElement("div", { className: "nav-section", style: { flex: 1 } },
+          React.createElement("div", { className: "nav-section" },
             React.createElement("div", { className: "nav-label" }, "Regions"),
             REGION_ORDER.map((r) => {
               const list = depotsForScope(data.depots, r);
               return React.createElement("button", { key: r, className: "nav-item" + (currentRegion === r ? " active" : ""), onClick: () => goRegion(r) },
                 r, " ", React.createElement("span", { className: "count" }, activeDepots(list).length));
+            })),
+          React.createElement("div", { className: "nav-section", style: { flex: 1 } },
+            React.createElement("div", { className: "nav-label" }, "Other Channels"),
+            OTHER_SCOPES.map((scope) => {
+              const rec = Object.values(data.depots).find((d) => d.region === scope);
+              return React.createElement("button", { key: scope, className: "nav-item" + (currentRegion === scope ? " active" : ""), onClick: () => goRegion(scope) },
+                rec ? rec.name : scope);
             }))),
     userIsAdmin && !isSC && React.createElement("div", { className: "nav-section" },
       React.createElement("div", { className: "nav-label" }, "Admin"),

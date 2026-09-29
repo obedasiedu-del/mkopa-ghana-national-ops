@@ -27,9 +27,9 @@ function RegionCard({ region }) {
 }
 
 function IndirectChannelCard() {
-  const { data, goDepot } = useApp();
+  const { data, goRegion } = useApp();
   const counts = countsForDevices(ledgerDevices(data.deviceLedger, "INDIRECT"));
-  return React.createElement("button", { className: "territory-card", onClick: () => goDepot("INDIRECT") },
+  return React.createElement("button", { className: "territory-card", onClick: () => goRegion("Indirect") },
     React.createElement("div", { className: "territory-name" }, "Indirect Channel", React.createElement("span", { className: "arrow" }, "→")),
     React.createElement("div", { className: "territory-stats" },
       React.createElement("div", null, React.createElement("div", { className: "territory-stat-num" }, fmtNum(counts.total)), React.createElement("div", { className: "territory-stat-label" }, "Devices")),

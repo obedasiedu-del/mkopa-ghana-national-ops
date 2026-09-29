@@ -1,12 +1,16 @@
 "use strict";
-import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct, computeScScore, SUBMISSION_MODELS } from "./domain.js";
+import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, REGION_ORDER, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct, computeScScore, SUBMISSION_MODELS } from "./domain.js";
 import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
 
-// Real (non-synthetic) depots, optionally filtered to one region, sorted by name.
+// Depots for a scope, sorted by name. "national" and the 9 real geographic regions exclude
+// synthetic depots (Indirect Sales, Unrecognised Shops, etc.) same as always. Any other scope
+// value -- currently just "Indirect", its own single-depot region -- is a synthetic depot's
+// own `region` column, so the exclusion is skipped there instead of it matching nothing.
 export function depotsForScope(depots, scope) {
-  let list = Object.values(depots).filter((d) => !d.isSynthetic);
+  let list = Object.values(depots);
+  if (scope === "national" || REGION_ORDER.includes(scope)) list = list.filter((d) => !d.isSynthetic);
   if (scope !== "national") list = list.filter((d) => d.region === scope);
   list.sort((a, b) => a.name.localeCompare(b.name));
   return list;
