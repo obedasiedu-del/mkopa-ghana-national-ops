@@ -11,6 +11,7 @@ import { BulkInventoryAccuracyModal } from "./BulkInventoryAccuracyModal.js";
 import { BulkMovementModal } from "./BulkMovementModal.js";
 import { ClearLedgerConfirm } from "./ClearLedgerConfirm.js";
 import { RecordMovementModal } from "./RecordMovementModal.js";
+import { AssignRoleModal } from "./AssignRoleModal.js";
 
 export function ModalHost() {
   const { modal } = useApp();
@@ -26,6 +27,7 @@ export function ModalHost() {
     case "bulkMovement": return React.createElement(BulkMovementModal, { ...modal.props });
     case "clearLedger": return React.createElement(ClearLedgerConfirm, { ...modal.props });
     case "recordMovement": return React.createElement(RecordMovementModal, { ...modal.props });
+    case "assignRole": return React.createElement(AssignRoleModal, { ...modal.props });
     default: return null;
   }
 }

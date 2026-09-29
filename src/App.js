@@ -11,6 +11,7 @@ import { MovementsPage } from "./pages/MovementsPage.js";
 import { AuditPage } from "./pages/AuditPage.js";
 import { HaltReportPage } from "./pages/HaltReportPage.js";
 import { SearchPage } from "./pages/SearchPage.js";
+import { AdminPage } from "./pages/AdminPage.js";
 import { ModalHost } from "./modals/ModalHost.js";
 import { ToastStack } from "./components/ui.js";
 
@@ -44,6 +45,7 @@ function Router() {
   if (route.name === "audit") return React.createElement(AuditPage, null);
   if (route.name === "halts") return React.createElement(HaltReportPage, null);
   if (route.name === "search") return React.createElement(SearchPage, null);
+  if (route.name === "admin") return React.createElement(AdminPage, null);
   return React.createElement(NationalOverviewPage, null);
 }
 

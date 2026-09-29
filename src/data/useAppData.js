@@ -515,6 +515,39 @@ export function useAppData() {
     if (error) throw error;
     return (data || []).map((r) => ({ date: r.snapshot_date, metrics: r.metrics }));
   }, []);
+  // User Management (admin-only, on-demand -- like Stock Movement/Audit History, not part of
+  // the eager-loaded set). user_directory mirrors just (id, email) from auth.users via a
+  // trigger, since the client can't query auth.users directly; left-joining it against
+  // user_roles client-side surfaces both assigned users and "pending access" signups with no
+  // role yet, in one list.
+  const fetchUsers = React.useCallback(async () => {
+    const [dirRes, rolesRes] = await Promise.all([
+      supabaseClient.from("user_directory").select("*").order("email", { ascending: true }),
+      supabaseClient.from("user_roles").select("*"),
+    ]);
+    if (dirRes.error) throw dirRes.error;
+    if (rolesRes.error) throw rolesRes.error;
+    const roleByUser = {};
+    (rolesRes.data || []).forEach((r) => { roleByUser[r.user_id] = r; });
+    return (dirRes.data || []).map((u) => {
+      const r = roleByUser[u.id];
+      return {
+        id: u.id, email: u.email, createdAt: u.created_at,
+        role: r ? r.role : null, region: r ? r.region : null, depotCode: r ? r.depot_code : null,
+      };
+    });
+  }, []);
+  const saveUserRole = React.useCallback(async (userId, patch) => {
+    const { error } = await supabaseClient.from("user_roles").upsert(
+      { user_id: userId, role: patch.role, region: patch.region || null, depot_code: patch.depotCode || null, updated_at: new Date().toISOString() },
+      { onConflict: "user_id" }
+    );
+    if (error) throw error;
+  }, []);
+  const removeUserRole = React.useCallback(async (userId) => {
+    const { error } = await supabaseClient.from("user_roles").delete().eq("user_id", userId);
+    if (error) throw error;
+  }, []);
   const fetchAuditLog = React.useCallback(async ({ depotCode, depotCodes, sinceIso, untilIso, limit = 200 } = {}) => {
     let q = supabaseClient.from("audit_log").select("*").order("occurred_at", { ascending: false }).limit(limit);
     if (depotCode) q = q.eq("depot_code", depotCode);
@@ -536,5 +569,6 @@ export function useAppData() {
     saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrBulk, saveInventoryAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
     captureSnapshot, fetchSnapshot, fetchSnapshotRange,
+    fetchUsers, saveUserRole, removeUserRole,
   };
 }

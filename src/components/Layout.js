@@ -3,10 +3,12 @@ import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { REGION_ORDER, USER_ROLES } from "../lib/domain.js";
 import { depotsForScope, activeDepots } from "../lib/selectors.js";
+import { isAdmin } from "../data/useAuth.js";
 
 function Sidebar() {
-  const { data, auth, route, goNational, goRegion } = useApp();
+  const { data, auth, route, goNational, goRegion, goAdmin } = useApp();
   const isSC = auth.role && auth.role.role === "depot_controller";
+  const userIsAdmin = isAdmin(auth.role);
   const allDepots = depotsForScope(data.depots, "national");
   const currentRegion = route.name === "region" ? route.region : (route.name === "depot" && data.depots[route.depotCode] ? data.depots[route.depotCode].region : null);
   const rec = isSC ? data.depots[auth.role.depotCode] : null;
@@ -37,6 +39,9 @@ function Sidebar() {
               return React.createElement("button", { key: r, className: "nav-item" + (currentRegion === r ? " active" : ""), onClick: () => goRegion(r) },
                 r, " ", React.createElement("span", { className: "count" }, activeDepots(list).length));
             }))),
+    userIsAdmin && !isSC && React.createElement("div", { className: "nav-section" },
+      React.createElement("div", { className: "nav-label" }, "Admin"),
+      React.createElement("button", { className: "nav-item" + (route.name === "admin" ? " active" : ""), onClick: goAdmin }, "User Management")),
     React.createElement("div", { className: "sidebar-footer" }, data.loaded ? "Synced" : (data.dbError ? "Connection error" : "Connecting…")));
 }
 
