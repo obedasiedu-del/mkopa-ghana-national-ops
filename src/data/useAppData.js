@@ -521,28 +521,43 @@ export function useAppData() {
   // user_roles client-side surfaces both assigned users and "pending access" signups with no
   // role yet, in one list.
   const fetchUsers = React.useCallback(async () => {
-    const [dirRes, rolesRes] = await Promise.all([
+    const [dirRes, rolesRes, regionsRes] = await Promise.all([
       supabaseClient.from("user_directory").select("*").order("email", { ascending: true }),
       supabaseClient.from("user_roles").select("*"),
+      supabaseClient.from("user_role_regions").select("*"),
     ]);
     if (dirRes.error) throw dirRes.error;
     if (rolesRes.error) throw rolesRes.error;
+    if (regionsRes.error) throw regionsRes.error;
     const roleByUser = {};
     (rolesRes.data || []).forEach((r) => { roleByUser[r.user_id] = r; });
+    const regionsByUser = {};
+    (regionsRes.data || []).forEach((r) => { (regionsByUser[r.user_id] || (regionsByUser[r.user_id] = [])).push(r.region); });
     return (dirRes.data || []).map((u) => {
       const r = roleByUser[u.id];
       return {
         id: u.id, email: u.email, createdAt: u.created_at,
-        role: r ? r.role : null, region: r ? r.region : null, depotCode: r ? r.depot_code : null,
+        role: r ? r.role : null, regions: regionsByUser[u.id] || [], depotCode: r ? r.depot_code : null,
       };
     });
   }, []);
+  // Full-replace write for one user's role: upsert user_roles first (region left null --
+  // user_role_regions is the source of truth for a Regional Manager's coverage, which can be
+  // more than one region), then delete+reinsert their region-membership rows to match exactly
+  // what was picked in the modal.
   const saveUserRole = React.useCallback(async (userId, patch) => {
     const { error } = await supabaseClient.from("user_roles").upsert(
-      { user_id: userId, role: patch.role, region: patch.region || null, depot_code: patch.depotCode || null, updated_at: new Date().toISOString() },
+      { user_id: userId, role: patch.role, region: null, depot_code: patch.depotCode || null, updated_at: new Date().toISOString() },
       { onConflict: "user_id" }
     );
     if (error) throw error;
+    const { error: delErr } = await supabaseClient.from("user_role_regions").delete().eq("user_id", userId);
+    if (delErr) throw delErr;
+    const regions = patch.regions || [];
+    if (regions.length) {
+      const { error: insErr } = await supabaseClient.from("user_role_regions").insert(regions.map((region) => ({ user_id: userId, region })));
+      if (insErr) throw insErr;
+    }
   }, []);
   const removeUserRole = React.useCallback(async (userId) => {
     const { error } = await supabaseClient.from("user_roles").delete().eq("user_id", userId);

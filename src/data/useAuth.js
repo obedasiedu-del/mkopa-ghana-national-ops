@@ -21,7 +21,15 @@ export function useAuth() {
     setRoleLoaded(false);
     const { data, error } = await supabaseClient.from("user_roles").select("*").eq("user_id", userId).maybeSingle();
     if (error) { setRole(null); setRoleLoaded(true); return; }
-    setRole(data ? { role: data.role, region: data.region, depotCode: data.depot_code } : null);
+    if (!data) { setRole(null); setRoleLoaded(true); return; }
+    // A Regional Manager can cover more than one region -- membership lives in
+    // user_role_regions (see the multi-region migration), not the old single region column.
+    let regions = [];
+    if (data.role === "regional_manager") {
+      const { data: regionRows } = await supabaseClient.from("user_role_regions").select("region").eq("user_id", userId);
+      regions = (regionRows || []).map((r) => r.region);
+    }
+    setRole({ role: data.role, regions, depotCode: data.depot_code });
     setRoleLoaded(true);
   }, []);
 
@@ -48,7 +56,7 @@ export function useAuth() {
 export function canWriteDepot(role, depotCode, depotRegion) {
   if (!role) return false;
   if (role.role === "national_admin") return true;
-  if (role.role === "regional_manager") return role.region === depotRegion;
+  if (role.role === "regional_manager") return (role.regions || []).includes(depotRegion);
   if (role.role === "depot_controller") return role.depotCode === depotCode;
   return false;
 }
