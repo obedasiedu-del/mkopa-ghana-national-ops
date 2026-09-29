@@ -36,7 +36,8 @@ export function AdminPage() {
     },
     {
       key: "scope", label: "Region / Depot",
-      render: (u) => u.role === "regional_manager" ? (u.regions && u.regions.length ? u.regions.join(", ") : "—")
+      render: (u) => u.role === "regional_manager" || u.role === "national_admin"
+        ? (u.regions && u.regions.length ? u.regions.join(", ") : "—")
         : u.role === "depot_controller" ? ((data.depots[u.depotCode] || {}).name || u.depotCode || "—")
         : "—",
     },

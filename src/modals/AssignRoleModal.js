@@ -23,7 +23,12 @@ export function AssignRoleModal({ user, onSaved }) {
   const [regions, setRegions] = React.useState(user.regions || []);
   const [depotCode, setDepotCode] = React.useState(user.depotCode || (depotOptions[0] || {}).code || "");
   const [saving, setSaving] = React.useState(false);
-  const needsRegions = role === "regional_manager";
+  const isRegionalManager = role === "regional_manager";
+  // A National Admin already has full read/write access everywhere -- picking regions for one
+  // doesn't change what they can do, it's just a "who's the named lead here" label (e.g. shown
+  // in the Region / Depot column). A Regional Manager's regions are the real thing driving
+  // their access, so at least one is required there.
+  const showRegions = isRegionalManager || role === "national_admin";
   const needsDepot = role === "depot_controller";
 
   function toggleRegion(r) {
@@ -31,11 +36,11 @@ export function AssignRoleModal({ user, onSaved }) {
   }
   function submit() {
     if (saving) return;
-    if (needsRegions && regions.length === 0) { toast("At least one region is required for a Regional Manager"); return; }
+    if (isRegionalManager && regions.length === 0) { toast("At least one region is required for a Regional Manager"); return; }
     if (needsDepot && !depotCode) { toast("A depot is required for a Depot / Stock Controller"); return; }
     setSaving(true);
     runAction(() => data.saveUserRole(user.id, {
-      role, regions: needsRegions ? regions : [], depotCode: needsDepot ? depotCode : null,
+      role, regions: showRegions ? regions : [], depotCode: needsDepot ? depotCode : null,
     }), "Role saved").then(() => { closeModal(); if (onSaved) onSaved(); }).finally(() => setSaving(false));
   }
   function revoke() {
@@ -53,8 +58,9 @@ export function AssignRoleModal({ user, onSaved }) {
       React.createElement("button", { className: "btn btn-primary", onClick: submit, disabled: saving }, saving ? "Saving…" : "Save Role")),
   },
     React.createElement(FieldSelect, { label: "Role", value: role, onChange: setRole, options: USER_ROLES.map((r) => [r.key, r.label]) }),
-    needsRegions && React.createElement("div", { className: "field-row" },
-      React.createElement("div", { className: "field-label" }, "Region(s) — select all that apply"),
+    showRegions && React.createElement("div", { className: "field-row" },
+      React.createElement("div", { className: "field-label" },
+        isRegionalManager ? "Region(s) — select all that apply" : "Region(s) led (optional — a National Admin already has full access everywhere; this is just a label)"),
       React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "6px 16px" } },
         REGION_ORDER.map((r) => React.createElement("label", { key: r, style: { display: "flex", alignItems: "center", gap: 6, fontSize: 13 } },
           React.createElement("input", { type: "checkbox", checked: regions.includes(r), onChange: () => toggleRegion(r) }),
