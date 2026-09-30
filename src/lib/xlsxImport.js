@@ -163,6 +163,62 @@ export function readInventoryAccuracySheet(wb, sheetName) {
   return { textRows, totalRows };
 }
 
+// The monthly "<MONTH> PRODUCTIVITY" sheet in the CCE tracker -- SHOP NAME / DAILY TARGET /
+// MONTH TO DATE TARGET / CCE-SC, then one daily footfall column per working day, ending in a
+// Total column. Several CCEs (and sometimes an SC filling in) can be listed under one shop;
+// footfall is a shop-level count regardless of who logged it, so every row under a shop is
+// summed into that shop's Total rather than picking out just one "the CCE" row -- unlike
+// Quality/SLA (per-agent metrics, not auto-imported here -- see readCceProductivitySheet's
+// own comment) footfall has no such per-person attribution problem.
+export function guessCceProductivitySheet(wb) {
+  const byName = wb.SheetNames.filter((n) => /productivity/i.test(n));
+  if (byName.length) {
+    const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+    const currentMonth = MONTHS[new Date().getMonth()];
+    const currentMatch = byName.find((n) => n.toLowerCase().indexOf(currentMonth) !== -1);
+    return currentMatch || byName[byName.length - 1];
+  }
+  const byHeader = wb.SheetNames.find((n) => sheetLooksLikeCceProductivity(wb, n));
+  return byHeader || wb.SheetNames[0];
+}
+function findCceProductivityHeaderRow(wb, sheetName) {
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: "", blankrows: false });
+  const idx = aoa.findIndex((row) => row.some((c) => normalizeHeader(c) === "shop name"));
+  return { aoa, idx };
+}
+export function sheetLooksLikeCceProductivity(wb, sheetName) {
+  return findCceProductivityHeaderRow(wb, sheetName).idx !== -1;
+}
+// Emits one tab-separated row per shop -- Depot\tQuality\tSLA\tFootfall, with Quality/SLA left
+// blank (this sheet doesn't carry them; paste those in separately, from a Quality/SLA export,
+// if you have one for this period) and Footfall as every listed person's Total, summed.
+export function readCceProductivitySheet(wb, sheetName) {
+  const { aoa, idx: headerIdx } = findCceProductivityHeaderRow(wb, sheetName);
+  if (headerIdx === -1) throw new Error('Could not find a "Shop Name" column on sheet "' + sheetName + '".');
+  const header = aoa[headerIdx];
+  const shopCol = header.findIndex((c) => normalizeHeader(c) === "shop name");
+  const cceCol = header.findIndex((c) => normalizeHeader(c).indexOf("cce") !== -1);
+  const totalCol = header.findIndex((c) => normalizeHeader(c) === "total");
+  if (cceCol === -1) throw new Error('Could not find a "CCE / SC" column on sheet "' + sheetName + '".');
+  if (totalCol === -1) throw new Error('Could not find a "Total" column on sheet "' + sheetName + '".');
+  let shop = "";
+  const byShop = {};
+  let totalRows = 0;
+  for (let i = headerIdx + 1; i < aoa.length; i++) {
+    const row = aoa[i];
+    const agent = row[cceCol];
+    if (!agent || !String(agent).trim()) continue; // header/weekday/target filler row, not a person
+    const shopCell = row[shopCol];
+    if (shopCell && String(shopCell).trim()) shop = String(shopCell).trim();
+    if (!shop) continue;
+    const total = Number(row[totalCol]);
+    totalRows++;
+    byShop[shop] = (byShop[shop] || 0) + (Number.isFinite(total) ? total : 0);
+  }
+  const textRows = Object.keys(byShop).map((s) => s + "\t\t\t" + byShop[s]);
+  return { textRows, totalRows, shopCount: textRows.length };
+}
+
 function excelSerialToDate(serial) {
   return new Date(Math.round((serial - 25569) * 86400000));
 }
