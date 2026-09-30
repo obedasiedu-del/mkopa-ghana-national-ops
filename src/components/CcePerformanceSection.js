@@ -101,14 +101,18 @@ export function CcePerformanceSection({ scope }) {
   // since it's uploaded at the depot level (often by the Stock Controller) and would otherwise
   // make every depot with an inventory accuracy entry look like it has a reporting CCE.
   const reportingRows = depotRows.filter((r) => r.qualityPct !== null || r.slaPct !== null || r.footfall !== null);
-  const avgOf = (key) => {
-    const vals = reportingRows.map((r) => r[key]).filter((v) => v !== null);
+  const avgOf = (rows, key) => {
+    const vals = rows.map((r) => r[key]).filter((v) => v !== null);
     return vals.length ? Math.round((vals.reduce((s, v) => s + v, 0) / vals.length) * 10) / 10 : null;
   };
-  const avgQuality = avgOf("qualityPct");
-  const avgSla = avgOf("slaPct");
+  const avgQuality = avgOf(reportingRows, "qualityPct");
+  const avgSla = avgOf(reportingRows, "slaPct");
   const sumFootfall = depotRows.reduce((s, r) => s + (r.footfall || 0), 0);
-  const avgInvAcc = avgOf("invAccPct");
+  // Inventory Accuracy is averaged over EVERY depot that has it in range, not just the ones
+  // that also happen to have a CCE quality/SLA/footfall entry in the exact same window --
+  // those two uploads run on independent schedules, so gating one on the other was silently
+  // dropping real Inventory Accuracy data (and showing NO TARGET) whenever they didn't align.
+  const avgInvAcc = avgOf(depotRows, "invAccPct");
 
   // Regional balance -- only meaningful at national scope, mirrors the Stock Controller
   // side's "Regions" grid but rolled up from this section's own CCE depot rows/date range.
