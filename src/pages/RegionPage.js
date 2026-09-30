@@ -8,6 +8,7 @@ import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
 import { DataTable } from "../components/DataTable.js";
+import { DirectAccuracySection } from "../components/DirectAccuracySection.js";
 import { fmtNum, fmtDateShort, REGION_ORDER, OTHER_SCOPES, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, trueAgePct } from "../lib/domain.js";
 import { depotsForScope, ledgerDevicesForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope, indirectAccuracyStats } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
@@ -172,6 +173,7 @@ export function RegionPage() {
         React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
         React.createElement(MovementTrendChart, { points: trendPoints }))),
     region === "Indirect" && React.createElement(IndirectAccuracySection, null),
+    REGION_ORDER.includes(region) && React.createElement(DirectAccuracySection, { scope: region }),
     React.createElement("div", { className: "section-heading", style: { marginTop: 14 } }, "Daily Submission — ", region),
     React.createElement(DailySubmissionOverview, { scope: region }),
     React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, ", region),
