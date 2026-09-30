@@ -12,6 +12,7 @@ import { BulkMovementModal } from "./BulkMovementModal.js";
 import { ClearLedgerConfirm } from "./ClearLedgerConfirm.js";
 import { RecordMovementModal } from "./RecordMovementModal.js";
 import { AssignRoleModal } from "./AssignRoleModal.js";
+import { ChangePasswordModal } from "./ChangePasswordModal.js";
 
 export function ModalHost() {
   const { modal } = useApp();
@@ -28,6 +29,7 @@ export function ModalHost() {
     case "clearLedger": return React.createElement(ClearLedgerConfirm, { ...modal.props });
     case "recordMovement": return React.createElement(RecordMovementModal, { ...modal.props });
     case "assignRole": return React.createElement(AssignRoleModal, { ...modal.props });
+    case "changePassword": return React.createElement(ChangePasswordModal, { ...modal.props });
     default: return null;
   }
 }

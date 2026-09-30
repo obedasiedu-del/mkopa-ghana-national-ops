@@ -59,7 +59,7 @@ function Sidebar() {
 }
 
 function Topbar() {
-  const { data, auth, search, setSearch, goSearch } = useApp();
+  const { data, auth, search, setSearch, goSearch, openModal } = useApp();
   const roleLabel = auth.role ? (USER_ROLES.find((r) => r.key === auth.role.role) || {}).label : null;
   const isSC = auth.role && auth.role.role === "depot_controller";
   function onSearchKeyDown(e) {
@@ -81,6 +81,7 @@ function Topbar() {
         React.createElement("div", { className: "user-menu" },
           roleLabel && React.createElement("span", { className: "pill pill-muted" }, roleLabel),
           React.createElement("span", { className: "user-menu-email" }, auth.user?.email),
+          React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("changePassword") }, "Change Password"),
           React.createElement("button", { className: "btn btn-sm", onClick: () => auth.signOut() }, "Sign out")))));
 }
 
