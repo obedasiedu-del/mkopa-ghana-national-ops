@@ -63,6 +63,7 @@ export function useAppData() {
   const [warehousePending, setWarehousePending] = React.useState({});
   const [psdsrByDepot, setPsdsrByDepot] = React.useState({});
   const [inventoryAccuracyByDepot, setInventoryAccuracyByDepot] = React.useState({});
+  const [inventoryAccuracyHistory, setInventoryAccuracyHistory] = React.useState([]);
   const [indirectShops, setIndirectShops] = React.useState({});
   const [indirectAccuracyByShop, setIndirectAccuracyByShop] = React.useState({});
   const [indirectAccuracyHistory, setIndirectAccuracyHistory] = React.useState([]);
@@ -140,6 +141,9 @@ export function useAppData() {
     rows.forEach((r) => {
       map[r.depot_code] = { pct: Number(r.accuracy_pct), periodDate: r.period_date, enteredBy: r.entered_by || "" };
     });
+    // Every week's entry, not just each depot's latest -- backs the from/to range picker on
+    // the National page, same reasoning as indirectAccuracyHistory below.
+    setInventoryAccuracyHistory(rows.map((r) => ({ depotCode: r.depot_code, periodDate: r.period_date, pct: Number(r.accuracy_pct) })));
     setInventoryAccuracyByDepot(map);
   }, []);
   // Indirect-channel partner shops (MTN/Vodafone/Telecel/I-Zone/MCS agents) aren't depots --
@@ -633,6 +637,7 @@ export function useAppData() {
 
   return {
     depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot, inventoryAccuracyByDepot,
+    inventoryAccuracyHistory,
     indirectShops, indirectAccuracyByShop, indirectAccuracyHistory,
     loaded, dbError, retryLoad: loadAll, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
