@@ -2,13 +2,13 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { canWriteDepot } from "../data/useAuth.js";
-import { KpiTile, Pill, ScStatusPill, ScoreCell, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, LedgerAgingBadge, HaltBanner } from "../components/ui.js";
+import { KpiTile, Pill, ScStatusPill, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, LedgerAgingBadge, HaltBanner } from "../components/ui.js";
 import { DataTable } from "../components/DataTable.js";
 import { ledgerDevices, depotStockTotals, latestSubmissionForDepot } from "../lib/selectors.js";
 import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
   SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
-  fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices, trueAgePct, psdsrPct, computeScScore,
+  fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices, trueAgePct, psdsrPct,
   groupDevicesByTier, downloadCsv, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED,
 } from "../lib/domain.js";
 
@@ -148,10 +148,6 @@ function DevicesTab({ rec, canWrite, isSC }) {
           React.createElement(KpiTile, {
             label: "Inventory Accuracy", value: data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct + "%" : "—",
             foot: data.inventoryAccuracyByDepot[rec.code] ? fmtDateShort(data.inventoryAccuracyByDepot[rec.code].periodDate) : "no entry yet",
-          }),
-          React.createElement(KpiTile, {
-            label: "SC Score", value: computeScScore({ trueAgePctVal: trueAgePct(counts), psdsrRow: data.psdsrByDepot[rec.code], inventoryAccuracyRow: data.inventoryAccuracyByDepot[rec.code] }) ?? "—",
-            foot: "True Age 30 + PSDSR 35 + Inventory 20 + Quiz 15",
           })),
         React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 10, gap: 8 } },
           React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("ledger", { depotCode: rec.code }) }, "Open device ledger →")),

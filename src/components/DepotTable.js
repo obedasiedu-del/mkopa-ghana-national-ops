@@ -1,10 +1,10 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { ScStatusPill, ScoreCell } from "./ui.js";
+import { ScStatusPill } from "./ui.js";
 import { DataTable } from "./DataTable.js";
 import { ledgerDevices, latestSubmissionForDepot } from "../lib/selectors.js";
-import { countsForDevices, submissionTotals, fmtNum, trueAgePct, psdsrPct, computeScScore } from "../lib/domain.js";
+import { countsForDevices, submissionTotals, fmtNum, trueAgePct, psdsrPct } from "../lib/domain.js";
 
 // Region-level view of the same per-depot device/aging figures the depot page itself shows
 // (Devices at Depot from the daily submission, 14+ Days from the device ledger) -- without
@@ -23,7 +23,6 @@ const COLUMNS = [
     render: (d) => d.scName || React.createElement("span", { style: { color: "var(--text-faint)" } }, "Unassigned"),
   },
   { key: "scStatus", label: "Status", sortable: true, render: (d) => React.createElement(ScStatusPill, { status: d.scStatus }) },
-  { key: "scScore", label: "SC Score", sortable: true, numeric: true, sortValue: (d) => d._scScore ?? -1, render: (d) => React.createElement(ScoreCell, { score: d._scScore }) },
   {
     key: "devicesAtDepot", label: "Devices at Depot", sortable: true, numeric: true,
     sortValue: (d) => d._devicesAtDepot ?? -1, render: (d) => d._devicesAtDepot === null ? "—" : fmtNum(d._devicesAtDepot),
@@ -59,7 +58,6 @@ export function DepotTable({ depots }) {
       ...d, _devicesAtDepot: latest ? submissionTotals(latest).totalStock : null, _aged14: ledgerCounts.urgent,
       _trueAge: trueAge, _psdsr: psdsrPct(psdsrRow),
       _inventoryAccuracy: invAccRow ? invAccRow.pct : null,
-      _scScore: computeScScore({ trueAgePctVal: trueAge, psdsrRow, inventoryAccuracyRow: invAccRow }),
     };
   }), [depots, data.submissionsByDepot, data.deviceLedger, data.psdsrByDepot, data.inventoryAccuracyByDepot]);
   const filtered = enriched.filter((d) => !q || (d.name + " " + d.code + " " + d.scName).toLowerCase().includes(q));

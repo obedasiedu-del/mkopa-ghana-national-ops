@@ -1,6 +1,6 @@
 "use strict";
 import React from "react";
-import { scoreColor, daysAllocated, ledgerTierFor, agingDate } from "../lib/domain.js";
+import { daysAllocated, ledgerTierFor, agingDate } from "../lib/domain.js";
 import { Sparkline } from "./charts/Sparkline.js";
 
 export function KpiTile({ label, value, foot }) {
@@ -37,14 +37,6 @@ export function ScStatusPill({ status }) {
   };
   const m = map[status] || map.vacant;
   return React.createElement(Pill, { cls: m.cls }, m.label);
-}
-export function ScoreCell({ score }) {
-  const pct = score === null || score === undefined ? 0 : Math.max(0, Math.min(100, score));
-  const color = scoreColor(score);
-  return React.createElement("div", { className: "score-cell" },
-    React.createElement("div", { className: "score-bar" },
-      React.createElement("div", { className: "score-bar-fill", style: { width: pct + "%", background: color } })),
-    React.createElement("div", { className: "score-num mono", style: { color } }, score === null || score === undefined ? "—" : String(score)));
 }
 export function FieldInput({ label, value, onChange, type = "text", placeholder, min, max }) {
   return React.createElement("div", { className: "field-row" },
