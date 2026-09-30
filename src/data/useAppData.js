@@ -65,6 +65,7 @@ export function useAppData() {
   const [inventoryAccuracyByDepot, setInventoryAccuracyByDepot] = React.useState({});
   const [indirectShops, setIndirectShops] = React.useState({});
   const [indirectAccuracyByShop, setIndirectAccuracyByShop] = React.useState({});
+  const [indirectAccuracyHistory, setIndirectAccuracyHistory] = React.useState([]);
   const [loaded, setLoaded] = React.useState(false);
   const [dbError, setDbError] = React.useState(null);
 
@@ -159,6 +160,11 @@ export function useAppData() {
       map[r.shop_code] = { pct: Number(r.accuracy_pct), periodDate: r.period_date, enteredBy: r.entered_by || "" };
     });
     setIndirectAccuracyByShop(map);
+    // Every week's entry, not just each shop's latest -- so a from/to range picker on the
+    // Indirect page can show the average over a chosen period instead of only ever "latest".
+    // The table stays small (one row per shop per week it was uploaded for), so keeping the
+    // full history in memory alongside the latest-map above is cheap.
+    setIndirectAccuracyHistory(rows.map((r) => ({ shopCode: r.shop_code, periodDate: r.period_date, pct: Number(r.accuracy_pct) })));
   }, []);
   // Warehouse-held stock that's earmarked for a depot but not physically there yet (still
   // sitting in a warehouse, per the source tracker's own "Warehouse Stock" state) -- kept
@@ -627,7 +633,7 @@ export function useAppData() {
 
   return {
     depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot, inventoryAccuracyByDepot,
-    indirectShops, indirectAccuracyByShop,
+    indirectShops, indirectAccuracyByShop, indirectAccuracyHistory,
     loaded, dbError, retryLoad: loadAll, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
     saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrBulk, saveInventoryAccuracyBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
