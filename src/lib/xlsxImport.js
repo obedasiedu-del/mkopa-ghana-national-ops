@@ -136,6 +136,10 @@ export function guessInventoryAccuracySheet(wb) {
   const byName = wb.SheetNames.find((n) => /inventory/i.test(n));
   return byName || wb.SheetNames[0];
 }
+export function guessIndirectAccuracySheet(wb) {
+  const byName = wb.SheetNames.find((n) => /indirect/i.test(n));
+  return byName || wb.SheetNames[0];
+}
 export function readInventoryAccuracySheet(wb, sheetName) {
   const ws = wb.Sheets[sheetName];
   const ref = ws["!ref"];

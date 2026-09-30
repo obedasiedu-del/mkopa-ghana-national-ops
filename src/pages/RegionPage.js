@@ -7,9 +7,44 @@ import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
-import { fmtNum, REGION_ORDER, OTHER_SCOPES, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, trueAgePct } from "../lib/domain.js";
-import { depotsForScope, ledgerDevicesForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope } from "../lib/selectors.js";
+import { DataTable } from "../components/DataTable.js";
+import { fmtNum, fmtDateShort, REGION_ORDER, OTHER_SCOPES, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, trueAgePct } from "../lib/domain.js";
+import { depotsForScope, ledgerDevicesForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope, indirectAccuracyStats } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
+
+const INDIRECT_ACCURACY_COLUMNS = [
+  { key: "name", label: "Shop", sortable: true },
+  { key: "region", label: "Territory", sortable: true },
+  { key: "pct", label: "Accuracy", numeric: true, sortable: true, sortValue: (r) => (r.pct === null ? -1 : r.pct), render: (r) => (r.pct === null ? "—" : r.pct + "%") },
+  { key: "periodDate", label: "As Of", sortable: true, render: (r) => (r.periodDate ? fmtDateShort(r.periodDate) : "—") },
+];
+function IndirectAccuracySection() {
+  const { data, auth, openModal } = useApp();
+  const userIsAdmin = isAdmin(auth.role);
+  const stats = indirectAccuracyStats(data);
+  const shopRows = React.useMemo(() => Object.values(data.indirectShops).map((s) => {
+    const row = data.indirectAccuracyByShop[s.code];
+    return { code: s.code, name: s.name, region: s.region, pct: row ? row.pct : null, periodDate: row ? row.periodDate : null };
+  }), [data.indirectShops, data.indirectAccuracyByShop]);
+  return React.createElement(React.Fragment, null,
+    React.createElement("div", { className: "section-heading-row", style: { marginTop: 22 } },
+      React.createElement("div", { className: "section-heading" }, "Indirect Stock Accuracy"),
+      userIsAdmin && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkIndirectAccuracy") }, "Upload Indirect Accuracy (All Shops)")),
+    stats.latestDate && stats.stale && React.createElement("div", { className: "banner", style: { marginBottom: 14 } },
+      React.createElement("span", null, "⚠"),
+      React.createElement("div", null,
+        React.createElement("strong", null, "Stale — "), "last updated ", fmtDateShort(stats.latestDate), " (", stats.daysStale, " days ago). This figure may no longer reflect reality.")),
+    !stats.latestDate && React.createElement("div", { className: "banner", style: { marginBottom: 14 } },
+      React.createElement("span", null, "⚠"),
+      React.createElement("div", null, "No Indirect Stock Accuracy entries on file yet.")),
+    React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
+      React.createElement(KpiTile, { label: "Indirect Stock Accuracy", value: stats.pct === null ? "—" : stats.pct + "%", foot: stats.latestDate ? "as of " + fmtDateShort(stats.latestDate) : "no entries yet" }),
+      React.createElement(KpiTile, { label: "Shops Reporting", value: stats.shopsReporting + "/" + stats.totalShops, foot: "with an accuracy entry on file" })),
+    React.createElement(DataTable, {
+      columns: INDIRECT_ACCURACY_COLUMNS, rows: shopRows, rowKey: (r) => r.code, defaultSortKey: "pct", defaultSortDir: "asc",
+      emptyMessage: "No indirect shops on file yet.",
+    }));
+}
 
 export function RegionPage() {
   const { data, auth, route, search, goNational, goMovements, goAudit, goHalts } = useApp();
@@ -95,6 +130,7 @@ export function RegionPage() {
       STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
         React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
         React.createElement(MovementTrendChart, { points: trendPoints }))),
+    region === "Indirect" && React.createElement(IndirectAccuracySection, null),
     React.createElement("div", { className: "section-heading", style: { marginTop: 14 } }, "Daily Submission — ", region),
     React.createElement(DailySubmissionOverview, { scope: region }),
     React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, ", region),

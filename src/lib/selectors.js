@@ -202,6 +202,32 @@ export function inventoryAccuracyStatsForScope(data, scope) {
   return { depotsReporting, totalDepots: depots.length, pct: depotsReporting ? Math.round((sum / depotsReporting) * 10) / 10 : null };
 }
 
+// Indirect Stock Accuracy -- same "plain average across whoever has an entry" rule as
+// Inventory Accuracy above, but over the indirect_shops registry (partner shops have no
+// depot_code, so they aren't part of depotsForScope at all) plus a staleness flag: the
+// underlying tracker has a history of going dark for months at a time (see the
+// indirect_accuracy_tracking migration's seed data), so callers need to know not just the
+// number but how old it is before presenting it as current.
+const INDIRECT_STALE_DAYS = 30;
+export function indirectAccuracyStats(data) {
+  const shops = Object.values(data.indirectShops || {});
+  let sum = 0, shopsReporting = 0, latestDate = null;
+  shops.forEach((s) => {
+    const row = data.indirectAccuracyByShop[s.code];
+    if (!row) return;
+    sum += row.pct;
+    shopsReporting++;
+    if (!latestDate || row.periodDate > latestDate) latestDate = row.periodDate;
+  });
+  const pct = shopsReporting ? Math.round((sum / shopsReporting) * 10) / 10 : null;
+  let daysStale = null;
+  if (latestDate) {
+    const diffMs = new Date(todayStr() + "T00:00:00") - new Date(latestDate + "T00:00:00");
+    daysStale = Math.round(diffMs / 86400000);
+  }
+  return { shopsReporting, totalShops: shops.length, pct, latestDate, daysStale, stale: daysStale === null || daysStale > INDIRECT_STALE_DAYS };
+}
+
 // Average computed SC Score across a scope's depots -- only over depots that actually have
 // both a PSDSR and an Inventory Accuracy entry (computeScScore returns null otherwise), same
 // "don't silently score what hasn't been reported yet" rule as the score itself.

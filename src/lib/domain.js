@@ -747,6 +747,44 @@ export function parseInventoryAccuracyPaste(text, depots) {
   return { byDepot, skipped, unmatchedRows, unmatchedCounts };
 }
 
+// Weekly Indirect Stock Accuracy bulk paste -- same shape and same "last cell is the
+// period's %" rule as parseInventoryAccuracyPaste above, but matched against the
+// indirect_shops registry (MTN/Vodafone/Telecel/I-Zone/MCS partner shops) instead of
+// depots, since these aren't depots and have no depot_code.
+export function parseIndirectAccuracyPaste(text, shops) {
+  const lines = splitPasteLines(text);
+  const shopIndex = buildDepotIndex(shops);
+  const matchCache = {};
+  function matchCached(shopText) {
+    const key = normalizeDepotName(shopText);
+    if (!(key in matchCache)) matchCache[key] = matchDepotForShop(shopText, shopIndex);
+    return matchCache[key];
+  }
+  const byShop = {};
+  const unmatchedRows = [];
+  const unmatchedCounts = {};
+  let skipped = 0;
+  lines.forEach((line, idx) => {
+    let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
+    cells = cells.map((c) => c.trim());
+    if (idx === 0 && /^(shop|depot)/i.test(cells[0] || "")) return;
+    const shopText = cells[0] || "";
+    const lastCell = cells[cells.length - 1] || "";
+    let pct = parseFloat(lastCell.replace("%", ""));
+    if (!shopText || Number.isNaN(pct)) { skipped++; return; }
+    pct = Math.max(0, Math.min(100, Math.round(pct * 10) / 10));
+    const code = matchCached(shopText);
+    if (!code) {
+      const key = shopText || "(blank shop)";
+      unmatchedCounts[key] = (unmatchedCounts[key] || 0) + 1;
+      unmatchedRows.push({ depotText: shopText, pct, reason: "Not matched to a shop on file" });
+      return;
+    }
+    byShop[code] = { pct };
+  });
+  return { byShop, skipped, unmatchedRows, unmatchedCounts };
+}
+
 // Bulk paste for stock movements (transfers/receipts/issues) -- e.g. a waybill/transit
 // export with a source and/or destination column per row. Column names are sniffed the
 // same way as the device paste above; From/To are matched against ALL depots including
