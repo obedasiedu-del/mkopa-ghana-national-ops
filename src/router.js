@@ -55,7 +55,7 @@ export function useRouter() {
 
   const navigate = React.useCallback((path) => { window.location.hash = path; }, []);
   const goNational = React.useCallback(() => navigate("#/"), [navigate]);
-  const goRegion = React.useCallback((region) => navigate("#/region/" + encodeURIComponent(region)), [navigate]);
+  const goRegion = React.useCallback((region, tab) => navigate("#/region/" + encodeURIComponent(region) + (tab ? "?tab=" + encodeURIComponent(tab) : "")), [navigate]);
   const goDepot = React.useCallback((code, tab) => navigate("#/depot/" + encodeURIComponent(code) + (tab ? "/" + tab : "")), [navigate]);
   const goSearch = React.useCallback((q) => navigate("#/search?q=" + encodeURIComponent(q)), [navigate]);
   const goAdmin = React.useCallback(() => navigate("#/admin"), [navigate]);

@@ -7,7 +7,7 @@ import { isAdmin } from "../data/useAuth.js";
 
 function Sidebar() {
   const { data, auth, route, goNational, goRegion, goAdmin, goDepot } = useApp();
-  const isSC = auth.role && auth.role.role === "depot_controller";
+  const isSC = auth.role && (auth.role.role === "depot_controller" || auth.role.role === "cce");
   const userIsAdmin = isAdmin(auth.role);
   const allDepots = depotsForScope(data.depots, "national");
   const currentRegion = route.name === "region" ? route.region : (route.name === "depot" && data.depots[route.depotCode] ? data.depots[route.depotCode].region : null);
@@ -61,7 +61,7 @@ function Sidebar() {
 function Topbar() {
   const { data, auth, search, setSearch, goSearch, openModal } = useApp();
   const roleLabel = auth.role ? (USER_ROLES.find((r) => r.key === auth.role.role) || {}).label : null;
-  const isSC = auth.role && auth.role.role === "depot_controller";
+  const isSC = auth.role && (auth.role.role === "depot_controller" || auth.role.role === "cce");
   function onSearchKeyDown(e) {
     if (e.key === "Enter" && search.trim()) goSearch(search.trim());
   }

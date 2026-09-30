@@ -35,11 +35,11 @@ export function AdminPage() {
       // the login itself is often still a placeholder (scXXX@mkopa-ghana-ops.internal) rather
       // than their personal email, so show the name as the primary line where we have it.
       render: (u) => {
-        const firstDepot = u.role === "depot_controller" && u.depotCodes && u.depotCodes.length ? data.depots[u.depotCodes[0]] : null;
-        const scName = firstDepot ? firstDepot.scName : null;
-        if (!scName) return u.email;
+        const firstDepot = (u.role === "depot_controller" || u.role === "cce") && u.depotCodes && u.depotCodes.length ? data.depots[u.depotCodes[0]] : null;
+        const personName = firstDepot ? (u.role === "cce" ? firstDepot.cceName : firstDepot.scName) : null;
+        if (!personName) return u.email;
         return React.createElement("div", null,
-          React.createElement("div", null, scName),
+          React.createElement("div", null, personName),
           React.createElement("div", { className: "mono", style: { fontSize: 11, color: "var(--text-faint)" } }, u.email));
       },
     },
@@ -51,7 +51,7 @@ export function AdminPage() {
       key: "scope", label: "Region / Depot",
       render: (u) => u.role === "regional_manager" || u.role === "national_admin"
         ? (u.regions && u.regions.length ? u.regions.join(", ") : "—")
-        : u.role === "depot_controller"
+        : u.role === "depot_controller" || u.role === "cce"
           ? (u.depotCodes && u.depotCodes.length ? u.depotCodes.map((c) => (data.depots[c] || {}).name || c).join(", ") : "—")
           : "—",
     },

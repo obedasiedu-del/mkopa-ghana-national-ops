@@ -31,7 +31,7 @@ export function AssignRoleModal({ user, onSaved }) {
   // in the Region / Depot column). A Regional Manager's regions are the real thing driving
   // their access, so at least one is required there.
   const showRegions = isRegionalManager || role === "national_admin";
-  const needsDepot = role === "depot_controller";
+  const needsDepot = role === "depot_controller" || role === "cce";
   const filteredDepots = depotOptions.filter((d) => {
     const q = depotFilter.trim().toLowerCase();
     return !q || d.name.toLowerCase().includes(q) || d.code.toLowerCase().includes(q);
@@ -46,7 +46,7 @@ export function AssignRoleModal({ user, onSaved }) {
   function submit() {
     if (saving) return;
     if (isRegionalManager && regions.length === 0) { toast("At least one region is required for a Regional Manager"); return; }
-    if (needsDepot && depotCodes.length === 0) { toast("At least one depot is required for a Depot / Stock Controller"); return; }
+    if (needsDepot && depotCodes.length === 0) { toast("At least one depot is required"); return; }
     setSaving(true);
     runAction(() => data.saveUserRole(user.id, {
       role, regions: showRegions ? regions : [], depotCodes: needsDepot ? depotCodes : [],

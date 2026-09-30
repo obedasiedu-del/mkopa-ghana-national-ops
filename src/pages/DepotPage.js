@@ -33,7 +33,7 @@ export function DepotPage() {
   if (!rec) return React.createElement("div", { className: "content" }, "Loading…");
 
   const canWrite = canWriteDepot(auth.role, rec.code, rec.region);
-  const isSC = auth.role && auth.role.role === "depot_controller";
+  const isSC = auth.role && (auth.role.role === "depot_controller" || auth.role.role === "cce");
   const haltPhase = activeHaltPhase();
   const haltStatus = haltPhase ? haltStatusForDepot(countsForDevices(ledgerDevices(data.deviceLedger, rec.code)), haltPhase) : null;
 
@@ -76,6 +76,15 @@ function DevicesTab({ rec, canWrite, isSC }) {
   function saveSc() {
     runAction(() => data.saveDepotField(rec.code, { scName: scName.trim(), scPhone: scPhone.trim(), scStatus, scNotes: scNotes.trim() }), "Saved");
   }
+  const [cceName, setCceName] = React.useState(rec.cceName);
+  const [ccePhone, setCcePhone] = React.useState(rec.ccePhone);
+  const [cceStatus, setCceStatus] = React.useState(rec.cceStatus);
+  const [cceNotes, setCceNotes] = React.useState(rec.cceNotes);
+  function saveCce() {
+    runAction(() => data.saveDepotField(rec.code, { cceName: cceName.trim(), ccePhone: ccePhone.trim(), cceStatus, cceNotes: cceNotes.trim() }), "Saved");
+  }
+
+  const cceRow = data.cceByDepot[rec.code];
 
   const balances = data.stockBalances[rec.code] || {};
   const models = Object.keys(balances).sort();
@@ -99,6 +108,22 @@ function DevicesTab({ rec, canWrite, isSC }) {
         React.createElement(FieldSelect, { label: "Status", value: scStatus, onChange: setScStatus, options: [["active", "Active"], ["leave", "On Leave"], ["vacant", "Vacant"]] }),
         React.createElement(FieldTextarea, { label: "Notes", value: scNotes, onChange: setScNotes }),
         canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveSc }, "Save Stock Controller")),
+      React.createElement("div", { className: "table-wrap", style: { padding: "14px 16px", marginBottom: 16 } },
+        React.createElement("div", { className: "drawer-section-title" }, "Customer Care Executive"),
+        React.createElement("div", { className: "field-grid" },
+          React.createElement(FieldInput, { label: "Name", value: cceName, onChange: setCceName }),
+          React.createElement(FieldInput, { label: "Phone", value: ccePhone, onChange: setCcePhone })),
+        React.createElement(FieldSelect, { label: "Status", value: cceStatus, onChange: setCceStatus, options: [["active", "Active"], ["leave", "On Leave"], ["vacant", "Vacant"]] }),
+        React.createElement(FieldTextarea, { label: "Notes", value: cceNotes, onChange: setCceNotes }),
+        canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveCce }, "Save Customer Care Executive")),
+      React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
+        React.createElement(KpiTile, { label: "Quality", value: cceRow && cceRow.qualityPct !== null ? cceRow.qualityPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
+        React.createElement(KpiTile, { label: "SLA Compliance", value: cceRow && cceRow.slaPct !== null ? cceRow.slaPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
+        React.createElement(KpiTile, { label: "Footfall", value: cceRow && cceRow.footfall !== null ? fmtNum(cceRow.footfall) : "—", foot: cceRow ? "latest week, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
+        React.createElement(KpiTile, {
+          label: "Inventory Accuracy", value: data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct + "%" : "—",
+          foot: data.inventoryAccuracyByDepot[rec.code] ? "latest, " + fmtDateShort(data.inventoryAccuracyByDepot[rec.code].periodDate) : "no entry yet",
+        })),
       React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
         React.createElement(KpiTile, { label: "Devices at Depot", value: subTotals ? fmtNum(subTotals.totalStock) : "—", foot: latestSubmission ? "from daily submission · " + fmtDateShort(latestSubmission.date) : "no daily submission yet" }),
         React.createElement(KpiTile, { label: "Aged (11d+, reported)", value: subTotals ? fmtNum(subTotals.agedStock) : "—", foot: "self-reported in submission" }),

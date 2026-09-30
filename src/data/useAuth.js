@@ -30,7 +30,7 @@ export function useAuth() {
     if (data.role === "regional_manager") {
       const { data: regionRows } = await supabaseClient.from("user_role_regions").select("region").eq("user_id", userId);
       regions = (regionRows || []).map((r) => r.region);
-    } else if (data.role === "depot_controller") {
+    } else if (data.role === "depot_controller" || data.role === "cce") {
       const { data: depotRows } = await supabaseClient.from("user_role_depots").select("depot_code").eq("user_id", userId);
       depotCodes = (depotRows || []).map((r) => r.depot_code);
     }
@@ -63,6 +63,7 @@ export function canWriteDepot(role, depotCode, depotRegion) {
   if (role.role === "national_admin") return true;
   if (role.role === "regional_manager") return (role.regions || []).includes(depotRegion);
   if (role.role === "depot_controller") return (role.depotCodes || []).includes(depotCode);
+  if (role.role === "cce") return (role.depotCodes || []).includes(depotCode);
   return false;
 }
 export function isAdmin(role) {

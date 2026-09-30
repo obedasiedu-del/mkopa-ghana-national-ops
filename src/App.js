@@ -15,13 +15,14 @@ import { AdminPage } from "./pages/AdminPage.js";
 import { ModalHost } from "./modals/ModalHost.js";
 import { ToastStack } from "./components/ui.js";
 
-// A Stock Controller is confined to her own depot page(s) -- everything else (National,
-// Region, Search, Movements/Audit/Halts logs) shows nothing but RLS-blocked fragments for
-// her anyway (fn_can_read_depot restricts every underlying table to her own depot(s)), so
-// letting her land on those pages at all just means broken, confusing partial data rather
-// than an actual leak. Most Stock Controllers run exactly one depot, but a few real people
-// run two (see user_role_depots) -- this redirects her to one of her own depots the moment
-// she's anywhere else, including a typed-in URL for a depot that isn't hers.
+// A Stock Controller (and, identically, a Customer Care Executive) is confined to her own
+// depot page(s) -- everything else (National, Region, Search, Movements/Audit/Halts logs)
+// shows nothing but RLS-blocked fragments for her anyway (fn_can_read_depot restricts every
+// underlying table to her own depot(s)), so letting her land on those pages at all just means
+// broken, confusing partial data rather than an actual leak. Most Stock Controllers/CCEs run
+// exactly one depot, but a few real people run two (see user_role_depots) -- this redirects
+// her to one of her own depots the moment she's anywhere else, including a typed-in URL for a
+// depot that isn't hers.
 function ScRouter() {
   const { route, auth, goDepot } = useApp();
   const depotCodes = auth.role.depotCodes || [];
@@ -39,7 +40,7 @@ function ScRouter() {
 }
 function Router() {
   const { route, auth } = useApp();
-  if (auth.role.role === "depot_controller") return React.createElement(ScRouter, null);
+  if (auth.role.role === "depot_controller" || auth.role.role === "cce") return React.createElement(ScRouter, null);
   if (route.name === "region") return React.createElement(RegionPage, null);
   if (route.name === "depot") return React.createElement(DepotPage, null);
   if (route.name === "movements") return React.createElement(MovementsPage, null);

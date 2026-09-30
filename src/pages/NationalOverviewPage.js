@@ -6,7 +6,9 @@ import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
 import { DirectAccuracySection } from "../components/DirectAccuracySection.js";
+import { CcePerformanceSection } from "../components/CcePerformanceSection.js";
 import { ViewingAsOfSection } from "../components/ViewingAsOfSection.js";
+import { Tabs } from "../components/ui.js";
 import { REGION_ORDER, fmtNum, countsForDevices, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED } from "../lib/domain.js";
 import { overviewStats, ledgerDevices, ledgerDevicesForScope, bucketMovementsByDay, haltStatusesForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
@@ -33,8 +35,12 @@ function IndirectChannelCard() {
       React.createElement("div", null, React.createElement("div", { className: "territory-stat-num" }, fmtNum(counts.urgent)), React.createElement("div", { className: "territory-stat-label" }, "Aged 14+d"))));
 }
 
+const PAGE_TABS = [{ id: "sc", label: "Stock Controller" }, { id: "cce", label: "CCE" }];
+
 export function NationalOverviewPage() {
-  const { data, auth, openModal, goMovements, goAudit, goHalts } = useApp();
+  const { data, auth, route, openModal, goMovements, goAudit, goHalts } = useApp();
+  const [activeTab, setActiveTab] = React.useState(route.query.tab === "cce" ? "cce" : "sc");
+  React.useEffect(() => { setActiveTab(route.query.tab === "cce" ? "cce" : "sc"); }, [route.query.tab]);
   const stats = overviewStats(data, "national");
   const c = stats.ledgerCounts;
   const userIsAdmin = isAdmin(auth.role);
@@ -71,35 +77,39 @@ export function NationalOverviewPage() {
         " under ", haltPhase.label, " — aged stock (14d+) above the phase limit. ",
         React.createElement("button", { className: "btn btn-sm", style: { marginLeft: 6 }, onClick: () => goHalts() }, "View Halt Status Report →"))),
     React.createElement(ViewingAsOfSection, { scope: "national", movements7d }),
-    React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 22 } },
-      STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements() }, "View Stock Movement Log →"),
-      userIsAdmin && React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit() }, "View Audit History →"),
-      React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts() }, "View Halt Status Report →")),
-    (userIsAdmin || STOCK_MOVEMENT_ENABLED) && React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
-      userIsAdmin && React.createElement("div", null,
-        React.createElement("div", { className: "section-heading" }, "Stock Aging Distribution"),
-        React.createElement(AgingBarChart, { counts: c })),
-      STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
-        React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
-        React.createElement(MovementTrendChart, { points: trendPoints }))),
-    React.createElement("div", { className: "section-heading" }, "Daily Submission — national"),
-    React.createElement(DailySubmissionOverview, { scope: "national" }),
-    React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, national"),
-    React.createElement(AgingBreakdown, { devices: nationalDevices, showDepotColumn: true }),
-    React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Regions"),
-    React.createElement("div", { className: "territory-grid" }, REGION_ORDER.map((r) => React.createElement(RegionCard, { key: r, region: r }))),
-    React.createElement("div", { className: "section-heading", style: { marginTop: 18 } }, "Other Channels"),
-    React.createElement("div", { className: "territory-grid", style: { marginBottom: 22 } }, React.createElement(IndirectChannelCard, null)),
-    React.createElement(DirectAccuracySection, { scope: "national" }),
-    userIsAdmin && React.createElement(React.Fragment, null,
-      React.createElement("div", { className: "section-heading-row" },
-        React.createElement("div", { className: "section-heading" }, "Bulk device data entry"),
-        React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
-          STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkDepotStock") }, "Upload Stock (All Depots)"),
-          React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => openModal("bulkLedger") }, "Upload Baseline (All Depots)"),
-          React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkPsdsr") }, "Upload PSDSR (All Depots)"),
-          React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkInventoryAccuracy") }, "Upload Inventory Accuracy (All Depots)"),
-          WAREHOUSE_PENDING_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkWarehouseStock") }, "Upload Warehouse Stock"),
-          React.createElement("button", { className: "btn btn-danger btn-sm", onClick: () => openModal("clearLedger") }, "Clear All Devices"))),
-      React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 14 } }, "Paste a full national device or stock export once — rows are matched to a depot automatically. See each button for column format.")));
+    React.createElement(Tabs, { tabs: PAGE_TABS, active: activeTab, onChange: setActiveTab }),
+    React.createElement("div", { style: { marginTop: 18 } }),
+    activeTab === "sc" && React.createElement(React.Fragment, null,
+      React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 22 } },
+        STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements() }, "View Stock Movement Log →"),
+        userIsAdmin && React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit() }, "View Audit History →"),
+        React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts() }, "View Halt Status Report →")),
+      (userIsAdmin || STOCK_MOVEMENT_ENABLED) && React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
+        userIsAdmin && React.createElement("div", null,
+          React.createElement("div", { className: "section-heading" }, "Stock Aging Distribution"),
+          React.createElement(AgingBarChart, { counts: c })),
+        STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
+          React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
+          React.createElement(MovementTrendChart, { points: trendPoints }))),
+      React.createElement("div", { className: "section-heading" }, "Daily Submission — national"),
+      React.createElement(DailySubmissionOverview, { scope: "national" }),
+      React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, national"),
+      React.createElement(AgingBreakdown, { devices: nationalDevices, showDepotColumn: true }),
+      React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Regions"),
+      React.createElement("div", { className: "territory-grid" }, REGION_ORDER.map((r) => React.createElement(RegionCard, { key: r, region: r }))),
+      React.createElement("div", { className: "section-heading", style: { marginTop: 18 } }, "Other Channels"),
+      React.createElement("div", { className: "territory-grid", style: { marginBottom: 22 } }, React.createElement(IndirectChannelCard, null)),
+      React.createElement(DirectAccuracySection, { scope: "national" }),
+      userIsAdmin && React.createElement(React.Fragment, null,
+        React.createElement("div", { className: "section-heading-row" },
+          React.createElement("div", { className: "section-heading" }, "Bulk device data entry"),
+          React.createElement("div", { style: { display: "flex", gap: 8, flexWrap: "wrap" } },
+            STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkDepotStock") }, "Upload Stock (All Depots)"),
+            React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => openModal("bulkLedger") }, "Upload Baseline (All Depots)"),
+            React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkPsdsr") }, "Upload PSDSR (All Depots)"),
+            React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkInventoryAccuracy") }, "Upload Inventory Accuracy (All Depots)"),
+            WAREHOUSE_PENDING_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkWarehouseStock") }, "Upload Warehouse Stock"),
+            React.createElement("button", { className: "btn btn-danger btn-sm", onClick: () => openModal("clearLedger") }, "Clear All Devices"))),
+        React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)", marginBottom: 14 } }, "Paste a full national device or stock export once — rows are matched to a depot automatically. See each button for column format."))),
+    activeTab === "cce" && React.createElement(CcePerformanceSection, { scope: "national" }));
 }

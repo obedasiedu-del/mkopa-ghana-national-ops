@@ -2,13 +2,14 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { DepotTable } from "../components/DepotTable.js";
-import { KpiTile, Breadcrumb } from "../components/ui.js";
+import { KpiTile, Breadcrumb, Tabs } from "../components/ui.js";
 import { AgingBarChart } from "../components/charts/AgingBarChart.js";
 import { MovementTrendChart } from "../components/charts/MovementTrendChart.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
 import { DataTable } from "../components/DataTable.js";
 import { DirectAccuracySection } from "../components/DirectAccuracySection.js";
+import { CcePerformanceSection } from "../components/CcePerformanceSection.js";
 import { ViewingAsOfSection } from "../components/ViewingAsOfSection.js";
 import { fmtDateShort, REGION_ORDER, OTHER_SCOPES, STOCK_MOVEMENT_ENABLED } from "../lib/domain.js";
 import { depotsForScope, ledgerDevicesForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, indirectAccuracyStats } from "../lib/selectors.js";
@@ -89,6 +90,8 @@ function IndirectAccuracySection() {
     }));
 }
 
+const PAGE_TABS = [{ id: "sc", label: "Stock Controller" }, { id: "cce", label: "CCE" }];
+
 export function RegionPage() {
   const { data, auth, route, search, goNational, goMovements, goAudit, goHalts } = useApp();
   const region = route.region;
@@ -96,6 +99,9 @@ export function RegionPage() {
     return React.createElement("div", { className: "content" },
       React.createElement("div", { className: "banner" }, React.createElement("span", null, "⚠"), React.createElement("div", null, "Unknown region \"" + region + "\".")));
   }
+  const showTabs = REGION_ORDER.includes(region);
+  const [activeTab, setActiveTab] = React.useState(route.query.tab === "cce" ? "cce" : "sc");
+  React.useEffect(() => { setActiveTab(route.query.tab === "cce" ? "cce" : "sc"); }, [region, route.query.tab]);
   const stats = overviewStats(data, region);
   const c = stats.ledgerCounts;
   const userIsAdmin = isAdmin(auth.role);
@@ -136,23 +142,27 @@ export function RegionPage() {
         " in ", region, " under ", haltPhase.label, " — aged stock (14d+) above the phase limit. ",
         React.createElement("button", { className: "btn btn-sm", style: { marginLeft: 6 }, onClick: () => goHalts(region) }, "View Halt Status Report →"))),
     React.createElement(ViewingAsOfSection, { scope: region, movements7d }),
-    React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } },
-      STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements(region) }, "View Stock Movement Log →"),
-      userIsAdmin && React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit(region) }, "View Audit History →"),
-      React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts(region) }, "View Halt Status Report →")),
-    (userIsAdmin || STOCK_MOVEMENT_ENABLED) && React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
-      userIsAdmin && React.createElement("div", null,
-        React.createElement("div", { className: "section-heading" }, "Stock Aging Distribution"),
-        React.createElement(AgingBarChart, { counts: c })),
-      STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
-        React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
-        React.createElement(MovementTrendChart, { points: trendPoints }))),
-    region === "Indirect" && React.createElement(IndirectAccuracySection, null),
-    REGION_ORDER.includes(region) && React.createElement(DirectAccuracySection, { scope: region }),
-    React.createElement("div", { className: "section-heading", style: { marginTop: 14 } }, "Daily Submission — ", region),
-    React.createElement(DailySubmissionOverview, { scope: region }),
-    React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, ", region),
-    React.createElement(AgingBreakdown, { devices: regionDevices, showDepotColumn: true }),
-    React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Depots in ", region),
-    React.createElement(DepotTable, { depots }));
+    showTabs && React.createElement(Tabs, { tabs: PAGE_TABS, active: activeTab, onChange: setActiveTab }),
+    showTabs && React.createElement("div", { style: { marginTop: 18 } }),
+    (!showTabs || activeTab === "sc") && React.createElement(React.Fragment, null,
+      React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } },
+        STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements(region) }, "View Stock Movement Log →"),
+        userIsAdmin && React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit(region) }, "View Audit History →"),
+        React.createElement("button", { className: "btn btn-sm", onClick: () => goHalts(region) }, "View Halt Status Report →")),
+      (userIsAdmin || STOCK_MOVEMENT_ENABLED) && React.createElement("div", { className: "chart-grid", style: { marginBottom: 22 } },
+        userIsAdmin && React.createElement("div", null,
+          React.createElement("div", { className: "section-heading" }, "Stock Aging Distribution"),
+          React.createElement(AgingBarChart, { counts: c })),
+        STOCK_MOVEMENT_ENABLED && React.createElement("div", null,
+          React.createElement("div", { className: "section-heading" }, "Stock Movement — last ", TREND_DAYS, " days"),
+          React.createElement(MovementTrendChart, { points: trendPoints }))),
+      region === "Indirect" && React.createElement(IndirectAccuracySection, null),
+      REGION_ORDER.includes(region) && React.createElement(DirectAccuracySection, { scope: region }),
+      React.createElement("div", { className: "section-heading", style: { marginTop: 14 } }, "Daily Submission — ", region),
+      React.createElement(DailySubmissionOverview, { scope: region }),
+      React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, ", region),
+      React.createElement(AgingBreakdown, { devices: regionDevices, showDepotColumn: true }),
+      React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Depots in ", region),
+      React.createElement(DepotTable, { depots })),
+    showTabs && activeTab === "cce" && React.createElement(CcePerformanceSection, { scope: region }));
 }

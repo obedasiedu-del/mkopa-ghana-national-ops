@@ -57,6 +57,7 @@ export const USER_ROLES = [
   { key: "national_admin", label: "National Admin" },
   { key: "regional_manager", label: "Regional Manager" },
   { key: "depot_controller", label: "Depot / Stock Controller" },
+  { key: "cce", label: "Customer Care Executive" },
   { key: "viewer", label: "Viewer / Reporting" },
 ];
 
@@ -704,6 +705,61 @@ export function parseInventoryAccuracyPaste(text, depots) {
       return;
     }
     byDepot[code] = { pct }; // last row for a depot wins if it appears twice in one paste
+  });
+  return { byDepot, skipped, unmatchedRows, unmatchedCounts };
+}
+
+// CCE (Customer Care Executive) performance weekly bulk paste -- one row per depot: Depot,
+// Quality %, SLA Compliance %, Footfall (devices handled, a plain count not a percentage).
+// Any of the three metric cells can be left blank in the paste (e.g. this week's Freshdesk
+// export only had Quality and SLA ready) -- a blank cell is carried through as undefined
+// rather than coerced to 0, so it's written as null and doesn't drag down an average that
+// hasn't actually been reported yet.
+export function parseCcePerformancePaste(text, depots) {
+  const lines = splitPasteLines(text);
+  const depotIndex = buildDepotIndex(depots);
+  const matchCache = {};
+  function matchCached(depotText) {
+    const key = normalizeDepotName(depotText);
+    if (!(key in matchCache)) matchCache[key] = matchDepotForShop(depotText, depotIndex);
+    return matchCache[key];
+  }
+  const byDepot = {};
+  const unmatchedRows = [];
+  const unmatchedCounts = {};
+  let skipped = 0;
+  function pctOrUndefined(raw) {
+    if (raw === undefined || raw === "") return undefined;
+    const v = parseFloat(String(raw).replace("%", ""));
+    return Number.isNaN(v) ? undefined : Math.max(0, Math.min(100, Math.round(v * 10) / 10));
+  }
+  lines.forEach((line, idx) => {
+    let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
+    cells = cells.map((c) => c.trim());
+    if (idx === 0 && /^(depot|shop)/i.test(cells[0] || "")) return;
+    const depotText = cells[0] || "";
+    const quality = pctOrUndefined(cells[1]);
+    const sla = pctOrUndefined(cells[2]);
+    const footfallRaw = cells[3];
+    let footfall;
+    if (footfallRaw !== undefined && footfallRaw !== "") {
+      const v = parseInt(footfallRaw, 10);
+      if (!Number.isNaN(v) && v >= 0) footfall = v;
+    }
+    if (!depotText || (quality === undefined && sla === undefined && footfall === undefined)) { skipped++; return; }
+    if (isIndirectChannelShop(depotText)) {
+      unmatchedCounts[depotText] = (unmatchedCounts[depotText] || 0) + 1;
+      unmatchedRows.push({ depotText, quality, sla, footfall, reason: "Indirect/partner shop, not a depot" });
+      return;
+    }
+    const code = matchCached(depotText);
+    if (!code) {
+      const key = depotText || "(blank depot)";
+      unmatchedCounts[key] = (unmatchedCounts[key] || 0) + 1;
+      unmatchedRows.push({ depotText, quality, sla, footfall, reason: "Not matched to a depot" });
+      return;
+    }
+    byDepot[code] = { quality, sla, footfall }; // last row for a depot wins if it appears twice in one paste
   });
   return { byDepot, skipped, unmatchedRows, unmatchedCounts };
 }

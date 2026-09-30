@@ -64,6 +64,8 @@ export function useAppData() {
   const [psdsrByDepot, setPsdsrByDepot] = React.useState({});
   const [inventoryAccuracyByDepot, setInventoryAccuracyByDepot] = React.useState({});
   const [inventoryAccuracyHistory, setInventoryAccuracyHistory] = React.useState([]);
+  const [cceByDepot, setCceByDepot] = React.useState({});
+  const [cceHistory, setCceHistory] = React.useState([]);
   const [indirectShops, setIndirectShops] = React.useState({});
   const [indirectAccuracyByShop, setIndirectAccuracyByShop] = React.useState({});
   const [indirectAccuracyHistory, setIndirectAccuracyHistory] = React.useState([]);
@@ -78,7 +80,10 @@ export function useAppData() {
         code: r.code, name: r.name, region: r.region, status: r.status,
         scName: r.sc_name || "", scPhone: r.sc_phone || "", scStatus: r.sc_status || "vacant",
         scScore: r.sc_score === null || r.sc_score === undefined ? null : Number(r.sc_score),
-        scNotes: r.sc_notes || "", isSynthetic: r.is_synthetic,
+        scNotes: r.sc_notes || "",
+        cceName: r.cce_name || "", ccePhone: r.cce_phone || "", cceStatus: r.cce_status || "vacant",
+        cceScore: r.cce_score === null || r.cce_score === undefined ? null : Number(r.cce_score),
+        cceNotes: r.cce_notes || "", isSynthetic: r.is_synthetic,
       };
     });
     setDepots(map);
@@ -145,6 +150,31 @@ export function useAppData() {
     // the National page, same reasoning as indirectAccuracyHistory below.
     setInventoryAccuracyHistory(rows.map((r) => ({ depotCode: r.depot_code, periodDate: r.period_date, pct: Number(r.accuracy_pct) })));
     setInventoryAccuracyByDepot(map);
+  }, []);
+  // CCE (Customer Care Executive) performance: Quality %, SLA Compliance %, and Footfall
+  // (devices handled) -- one row per depot per week, same shape/logic as Inventory Accuracy
+  // above. Quality/SLA are averaged and Footfall is summed over a chosen date range by the
+  // CCE performance section, so every week's entry is kept (not just each depot's latest).
+  // Inventory Accuracy for a CCE's own depot reuses inventoryAccuracyHistory above rather
+  // than duplicating it here -- it's a property of the depot's stock, not of the CCE role.
+  const refreshCcePerformance = React.useCallback(async () => {
+    const rows = await fetchAll("cce_performance_weekly", "period_date");
+    const map = {};
+    rows.forEach((r) => {
+      map[r.depot_code] = {
+        qualityPct: r.quality_pct === null ? null : Number(r.quality_pct),
+        slaPct: r.sla_pct === null ? null : Number(r.sla_pct),
+        footfall: r.footfall_count === null ? null : Number(r.footfall_count),
+        periodDate: r.period_date, enteredBy: r.entered_by || "",
+      };
+    });
+    setCceByDepot(map);
+    setCceHistory(rows.map((r) => ({
+      depotCode: r.depot_code, periodDate: r.period_date,
+      qualityPct: r.quality_pct === null ? null : Number(r.quality_pct),
+      slaPct: r.sla_pct === null ? null : Number(r.sla_pct),
+      footfall: r.footfall_count === null ? null : Number(r.footfall_count),
+    })));
   }, []);
   // Indirect-channel partner shops (MTN/Vodafone/Telecel/I-Zone/MCS agents) aren't depots --
   // they have no depot_code -- so they get their own tiny registry (indirect_shops) plus a
@@ -217,12 +247,12 @@ export function useAppData() {
       tagSource("depots", refreshDepots), tagSource("stock balances", refreshStockBalances),
       tagSource("submissions", refreshSubmissions), tagSource("ledger baseline", refreshLedgerBaseline),
       tagSource("device ledger", refreshDeviceLedger), tagSource("psdsr", refreshPsdsr),
-      tagSource("inventory accuracy", refreshInventoryAccuracy),
+      tagSource("inventory accuracy", refreshInventoryAccuracy), tagSource("cce performance", refreshCcePerformance),
       tagSource("indirect shops", refreshIndirectShops), tagSource("indirect accuracy", refreshIndirectAccuracy),
     ];
     if (WAREHOUSE_PENDING_ENABLED) tasks.push(tagSource("warehouse pending", refreshWarehousePending));
     return Promise.all(tasks);
-  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshPsdsr, refreshInventoryAccuracy, refreshIndirectShops, refreshIndirectAccuracy, refreshWarehousePending]);
+  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshPsdsr, refreshInventoryAccuracy, refreshCcePerformance, refreshIndirectShops, refreshIndirectAccuracy, refreshWarehousePending]);
   const loadAll = React.useCallback(async () => {
     try {
       setDbError(null);
@@ -255,6 +285,7 @@ export function useAppData() {
     depots: refreshDepots, stock_movements: refreshStockBalances,
     submissions: refreshSubmissions, device_ledger_baseline: refreshLedgerBaseline, device_ledger: refreshDeviceLedger,
     psdsr_weekly: refreshPsdsr, inventory_accuracy_weekly: refreshInventoryAccuracy,
+    cce_performance_weekly: refreshCcePerformance,
     indirect_shops: refreshIndirectShops, indirect_accuracy_weekly: refreshIndirectAccuracy,
     ...(WAREHOUSE_PENDING_ENABLED ? { warehouse_pending_stock: refreshWarehousePending } : {}),
   };
@@ -278,6 +309,11 @@ export function useAppData() {
     if ("scStatus" in patch) body.sc_status = patch.scStatus;
     if ("scScore" in patch) body.sc_score = patch.scScore;
     if ("scNotes" in patch) body.sc_notes = patch.scNotes;
+    if ("cceName" in patch) body.cce_name = patch.cceName;
+    if ("ccePhone" in patch) body.cce_phone = patch.ccePhone;
+    if ("cceStatus" in patch) body.cce_status = patch.cceStatus;
+    if ("cceScore" in patch) body.cce_score = patch.cceScore;
+    if ("cceNotes" in patch) body.cce_notes = patch.cceNotes;
     body.updated_at = new Date().toISOString();
     const { error } = await supabaseClient.from("depots").update(body).eq("code", code);
     if (error) throw error;
@@ -394,6 +430,25 @@ export function useAppData() {
     await refreshInventoryAccuracy();
     return codes.length;
   }, [refreshInventoryAccuracy]);
+  // byDepotMap[code] carries whichever of {quality, sla, footfall} was tagged in the paste --
+  // an un-tagged column stays undefined and is written as null, same "some columns
+  // this week, not others" flexibility the rest of the bulk-paste tools allow.
+  const saveCcePerformanceBulk = React.useCallback(async (byDepotMap, enteredBy, periodDate) => {
+    const codes = Object.keys(byDepotMap);
+    if (!codes.length) throw new Error("No matched rows to save yet — check the depot names.");
+    const rows = codes.map((code) => ({
+      depot_code: code, period_date: periodDate,
+      quality_pct: byDepotMap[code].quality ?? null, sla_pct: byDepotMap[code].sla ?? null,
+      footfall_count: byDepotMap[code].footfall ?? null,
+      entered_by: enteredBy || null, updated_at: new Date().toISOString(),
+    }));
+    for (const batch of chunkArr(rows, 500)) {
+      const { error } = await supabaseClient.from("cce_performance_weekly").upsert(batch, { onConflict: "depot_code,period_date" });
+      if (error) throw error;
+    }
+    await refreshCcePerformance();
+    return codes.length;
+  }, [refreshCcePerformance]);
   const saveIndirectAccuracyBulk = React.useCallback(async (byShopMap, enteredBy, periodDate) => {
     const codes = Object.keys(byShopMap);
     if (!codes.length) throw new Error("No matched rows to save yet — check the shop names.");
@@ -638,10 +693,11 @@ export function useAppData() {
   return {
     depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot, inventoryAccuracyByDepot,
     inventoryAccuracyHistory,
+    cceByDepot, cceHistory,
     indirectShops, indirectAccuracyByShop, indirectAccuracyHistory,
     loaded, dbError, retryLoad: loadAll, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
-    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrBulk, saveInventoryAccuracyBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
+    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrBulk, saveInventoryAccuracyBulk, saveCcePerformanceBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
     captureSnapshot, fetchSnapshot, fetchSnapshotRange,
     fetchUsers, saveUserRole, removeUserRole,
