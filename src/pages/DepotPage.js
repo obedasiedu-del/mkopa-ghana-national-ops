@@ -58,16 +58,16 @@ export function DepotPage() {
     React.createElement(HaltBanner, { status: haltStatus }),
     React.createElement(Tabs, { tabs: DEPOT_TABS, active: tab, onChange: (id) => window.location.hash = "#/depot/" + encodeURIComponent(rec.code) + "/" + id }),
     React.createElement("div", { style: { marginTop: 16 } },
-      tab === "devices" && React.createElement(DevicesTab, { rec, canWrite }),
+      tab === "devices" && React.createElement(DevicesTab, { rec, canWrite, isSC }),
       tab === "submission" && React.createElement(SubmissionTab, { rec, canWrite }),
       tab === "movement" && React.createElement(MovementTab, { rec, canWrite }),
-      tab === "aging" && React.createElement(AgingTab, { rec }),
+      tab === "aging" && React.createElement(AgingTab, { rec, isSC }),
       tab === "warehouse" && React.createElement(WarehouseTab, { rec }),
       tab === "audit" && React.createElement(AuditTab, { rec })));
 }
 
 /* ============ Devices: At Depot / With DSRs + Stock Controller ============ */
-function DevicesTab({ rec, canWrite }) {
+function DevicesTab({ rec, canWrite, isSC }) {
   const { data, openModal, runAction } = useApp();
   const [sub, setSub] = React.useState("depot");
   const [scName, setScName] = React.useState(rec.scName);
@@ -138,7 +138,7 @@ function DevicesTab({ rec, canWrite }) {
         React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
           React.createElement(KpiTile, { label: "Devices tracked", value: fmtNum(counts.total), foot: "with a DSR or resolved" }),
           React.createElement(KpiTile, { label: "Fresh (0–9d)", value: fmtNum(counts.fresh), foot: "on track" }),
-          React.createElement(KpiTile, { label: "Aged (10+d)", value: fmtNum(counts.aged + counts.urgent), foot: "needs attention" }),
+          !isSC && React.createElement(KpiTile, { label: "Aged (10+d)", value: fmtNum(counts.aged + counts.urgent), foot: "needs attention" }),
           React.createElement(KpiTile, { label: "14+ Days", value: fmtNum(counts.urgent), foot: "escalate now" }),
           React.createElement(KpiTile, { label: "True Age", value: trueAgePct(counts) === null ? "—" : trueAgePct(counts) + "%", foot: "14d+ share of active (in-trade) stock" }),
           React.createElement(KpiTile, {
@@ -251,20 +251,21 @@ function MovementTab({ rec, canWrite }) {
 }
 
 /* ============ Stock Aging ============ */
-function AgingTab({ rec }) {
+function AgingTab({ rec, isSC }) {
   const { data } = useApp();
   const devices = ledgerDevices(data.deviceLedger, rec.code);
   const groups = groupDevicesByTier(devices);
+  const tiers = isSC ? LEDGER_TIERS.filter((t) => t.key !== "aged") : LEDGER_TIERS;
   const [activeTier, setActiveTier] = React.useState(null);
   const shown = activeTier ? groups[activeTier] : [];
   return React.createElement(React.Fragment, null,
     React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-      LEDGER_TIERS.map((t) => React.createElement("button", { key: t.key, className: "kpi-tile", style: { textAlign: "left", cursor: "pointer", outline: activeTier === t.key ? "2px solid var(--accent, #2a78d6)" : "none" }, onClick: () => setActiveTier((a) => (a === t.key ? null : t.key)) },
+      tiers.map((t) => React.createElement("button", { key: t.key, className: "kpi-tile", style: { textAlign: "left", cursor: "pointer", outline: activeTier === t.key ? "2px solid var(--accent, #2a78d6)" : "none" }, onClick: () => setActiveTier((a) => (a === t.key ? null : t.key)) },
         React.createElement("div", { className: "kpi-label" }, t.label),
         React.createElement("div", { className: "kpi-value" }, fmtNum(groups[t.key].length)),
         React.createElement("div", { className: "kpi-foot" }, t.min === undefined ? "0–" + t.max + " days" : t.max === undefined ? t.min + "+ days" : t.min + "–" + t.max + " days")))),
     activeTier && React.createElement(React.Fragment, null,
-      React.createElement("div", { className: "drawer-section-title" }, LEDGER_TIERS.find((t) => t.key === activeTier).label, " devices"),
+      React.createElement("div", { className: "drawer-section-title" }, tiers.find((t) => t.key === activeTier).label, " devices"),
       React.createElement(DataTable, {
         columns: AGING_COLUMNS, rows: shown, rowKey: (dv) => dv.serial, defaultSortKey: "allocatedDate",
         emptyMessage: "No devices in this tier.",
