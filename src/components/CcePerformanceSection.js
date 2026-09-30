@@ -3,7 +3,7 @@ import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { KpiTile } from "./ui.js";
 import { DataTable } from "./DataTable.js";
-import { fmtDateShort, fmtNum, todayStr, REGION_ORDER } from "../lib/domain.js";
+import { fmtDateShort, fmtNum, todayStr, REGION_ORDER, kpiBadge } from "../lib/domain.js";
 import { isAdmin } from "../data/useAuth.js";
 
 function firstOfMonth(dateStr) {
@@ -147,10 +147,10 @@ export function CcePerformanceSection({ scope }) {
       React.createElement("div", { className: "kpi-datebar-summary" },
         isMTD ? "Month-to-date" : fmtDateShort(fromDate) + " – " + fmtDateShort(toDate))),
     React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-      React.createElement(KpiTile, { label: "Quality", value: avgQuality === null ? "—" : avgQuality + "%", foot: "average, " + (isMTD ? "month-to-date" : "selected range") }),
-      React.createElement(KpiTile, { label: "SLA Compliance", value: avgSla === null ? "—" : avgSla + "%", foot: "average, " + (isMTD ? "month-to-date" : "selected range") }),
+      React.createElement(KpiTile, { label: "Quality", value: avgQuality === null ? "—" : avgQuality + "%", foot: "average, " + (isMTD ? "month-to-date" : "selected range"), badge: kpiBadge("qualityPct", avgQuality) }),
+      React.createElement(KpiTile, { label: "SLA Compliance", value: avgSla === null ? "—" : avgSla + "%", foot: "average, " + (isMTD ? "month-to-date" : "selected range"), badge: kpiBadge("slaPct", avgSla) }),
       React.createElement(KpiTile, { label: "Footfall", value: fmtNum(sumFootfall), foot: "sum total, " + (isMTD ? "month-to-date" : "selected range") }),
-      React.createElement(KpiTile, { label: "Inventory Accuracy", value: avgInvAcc === null ? "—" : avgInvAcc + "%", foot: "average, " + (isMTD ? "month-to-date" : "selected range") })),
+      React.createElement(KpiTile, { label: "Inventory Accuracy", value: avgInvAcc === null ? "—" : avgInvAcc + "%", foot: "average, " + (isMTD ? "month-to-date" : "selected range"), badge: kpiBadge("inventoryAccuracyPct", avgInvAcc) })),
     isNational && React.createElement(React.Fragment, null,
       React.createElement("div", { className: "drawer-section-title", style: { marginBottom: 10 } }, "Regional Balance"),
       React.createElement("div", { className: "territory-grid", style: { marginBottom: 16 } }, regionRows.map((r) => (

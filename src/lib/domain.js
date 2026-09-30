@@ -75,8 +75,15 @@ export const KPI_TARGETS = {
   trueAgePct: { max: 8 },      // lower is better
   psdsrPct: { min: 70 },
   inventoryAccuracyPct: { min: 98 },
+  // Customer Care Executive KPIs (Quality/SLA Compliance targets) -- from the official CCE
+  // KPI framework. Resolution Time (15pt weight there) is deliberately not tracked here at
+  // all, and Productivity/Footfall's target is "Shop Specific" (no single number), so it
+  // stays NO TARGET same as any other business metric without one agreed figure.
+  qualityPct: { min: 95 },
+  slaPct: { min: 95 },
   // SC Coverage and Daily Submission Status are informational only (no target) -- only
-  // True Age, PSDSR, Inventory Accuracy, and Allocation Halts carry a real target.
+  // True Age, PSDSR, Inventory Accuracy, Quality, SLA Compliance, and Allocation Halts
+  // carry a real target.
 };
 export function kpiBadge(key, value) {
   const t = KPI_TARGETS[key];

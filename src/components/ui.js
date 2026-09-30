@@ -3,9 +3,13 @@ import React from "react";
 import { daysAllocated, ledgerTierFor, agingDate } from "../lib/domain.js";
 import { Sparkline } from "./charts/Sparkline.js";
 
-export function KpiTile({ label, value, foot }) {
+export function KpiTile({ label, value, foot, badge }) {
   return React.createElement("div", { className: "kpi-tile" },
-    React.createElement("div", { className: "kpi-label" }, label),
+    badge
+      ? React.createElement("div", { className: "kpi-card-top" },
+          React.createElement("div", { className: "kpi-label" }, label),
+          React.createElement(Pill, { cls: badge.cls }, badge.label))
+      : React.createElement("div", { className: "kpi-label" }, label),
     React.createElement("div", { className: "kpi-value" }, value),
     React.createElement("div", { className: "kpi-foot" }, foot));
 }

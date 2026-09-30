@@ -10,7 +10,7 @@ import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
   SUBMISSION_MODELS, LEDGER_TIERS, LEDGER_TIER_COLOR_VAR, submissionTotals, todayStr,
   fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices, trueAgePct, psdsrPct,
-  groupDevicesByTier, downloadCsv, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED,
+  groupDevicesByTier, downloadCsv, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, kpiBadge,
 } from "../lib/domain.js";
 
 const DEPOT_TABS = [
@@ -102,12 +102,13 @@ function CceCard({ rec, canWrite }) {
       React.createElement(FieldTextarea, { label: "Notes", value: cceNotes, onChange: setCceNotes }),
       canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveCce }, "Save Customer Care Executive")),
     React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-      React.createElement(KpiTile, { label: "Quality", value: cceRow && cceRow.qualityPct !== null ? cceRow.qualityPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
-      React.createElement(KpiTile, { label: "SLA Compliance", value: cceRow && cceRow.slaPct !== null ? cceRow.slaPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
+      React.createElement(KpiTile, { label: "Quality", value: cceRow && cceRow.qualityPct !== null ? cceRow.qualityPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet", badge: kpiBadge("qualityPct", cceRow ? cceRow.qualityPct : null) }),
+      React.createElement(KpiTile, { label: "SLA Compliance", value: cceRow && cceRow.slaPct !== null ? cceRow.slaPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet", badge: kpiBadge("slaPct", cceRow ? cceRow.slaPct : null) }),
       React.createElement(KpiTile, { label: "Footfall", value: cceRow && cceRow.footfall !== null ? fmtNum(cceRow.footfall) : "—", foot: cceRow ? "latest week, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
       React.createElement(KpiTile, {
         label: "Inventory Accuracy", value: data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct + "%" : "—",
         foot: data.inventoryAccuracyByDepot[rec.code] ? "latest, " + fmtDateShort(data.inventoryAccuracyByDepot[rec.code].periodDate) : "no entry yet",
+        badge: kpiBadge("inventoryAccuracyPct", data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct : null),
       })));
 }
 
