@@ -5,12 +5,15 @@ import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
 
 // Depots for a scope, sorted by name. "national" and the 9 real geographic regions exclude
-// synthetic depots (Indirect Sales, Unrecognised Shops, etc.) same as always. Any other scope
-// value -- currently just "Indirect", its own single-depot region -- is a synthetic depot's
-// own `region` column, so the exclusion is skipped there instead of it matching nothing.
+// synthetic depots (Indirect Sales, Unrecognised Shops, etc.) same as always, plus CCE-only
+// service centres (cce_only -- e.g. Circle, Dzorwulu, Kumasi) that have no stock/DSR data of
+// their own and only exist for the CCE side (see CcePerformanceSection, which deliberately
+// does NOT filter on cce_only so they still show up there). Any other scope value --
+// currently just "Indirect", its own single-depot region -- is a synthetic depot's own
+// `region` column, so the exclusion is skipped there instead of it matching nothing.
 export function depotsForScope(depots, scope) {
   let list = Object.values(depots);
-  if (scope === "national" || REGION_ORDER.includes(scope)) list = list.filter((d) => !d.isSynthetic);
+  if (scope === "national" || REGION_ORDER.includes(scope)) list = list.filter((d) => !d.isSynthetic && !d.cceOnly);
   if (scope !== "national") list = list.filter((d) => d.region === scope);
   list.sort((a, b) => a.name.localeCompare(b.name));
   return list;

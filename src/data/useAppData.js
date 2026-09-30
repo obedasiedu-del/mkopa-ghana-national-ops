@@ -83,7 +83,7 @@ export function useAppData() {
         scNotes: r.sc_notes || "",
         cceName: r.cce_name || "", ccePhone: r.cce_phone || "", cceStatus: r.cce_status || "vacant",
         cceScore: r.cce_score === null || r.cce_score === undefined ? null : Number(r.cce_score),
-        cceNotes: r.cce_notes || "", isSynthetic: r.is_synthetic,
+        cceNotes: r.cce_notes || "", isSynthetic: r.is_synthetic, cceOnly: !!r.cce_only,
       };
     });
     setDepots(map);

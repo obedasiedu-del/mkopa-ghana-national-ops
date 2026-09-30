@@ -25,7 +25,7 @@ export function DirectAccuracySection({ scope }) {
   const userIsAdmin = isAdmin(auth.role);
   const isNational = scope === "national";
   const allDepots = React.useMemo(
-    () => Object.values(data.depots).filter((d) => !d.isSynthetic && (isNational || d.region === scope)),
+    () => Object.values(data.depots).filter((d) => !d.isSynthetic && !d.cceOnly && (isNational || d.region === scope)),
     [data.depots, scope, isNational]
   );
   const scopedCodes = React.useMemo(() => new Set(allDepots.map((d) => d.code)), [allDepots]);
