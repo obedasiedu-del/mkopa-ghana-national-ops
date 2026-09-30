@@ -38,6 +38,7 @@ export function DirectAccuracySection({ scope }) {
   const maxDate = sortedDates[sortedDates.length - 1] || null;
   const [fromDate, setFromDate] = React.useState("");
   const [toDate, setToDate] = React.useState("");
+  const [tableOpen, setTableOpen] = React.useState(false);
   const effFrom = fromDate || minDate;
   const effTo = toDate || maxDate;
   const isCustomRange = !!(fromDate || toDate);
@@ -86,7 +87,17 @@ export function DirectAccuracySection({ scope }) {
     React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
       React.createElement(KpiTile, { label: "Direct Stock Accuracy", value: rangeAvg === null ? "—" : rangeAvg + "%", foot: effFrom && effTo ? fmtDateShort(effFrom) + " – " + fmtDateShort(effTo) : "no entries yet" }),
       React.createElement(KpiTile, { label: "Depots Reporting", value: depotsInRange + "/" + allDepots.length, foot: "in selected range" })),
-    React.createElement(DataTable, {
+    React.createElement("button", {
+      className: "table-wrap",
+      style: { display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", textAlign: "left", padding: "14px 16px", cursor: "pointer", marginBottom: tableOpen ? 16 : 0 },
+      onClick: () => setTableOpen((o) => !o),
+    },
+      React.createElement("div", null,
+        React.createElement("div", { className: "drawer-section-title", style: { marginBottom: 2 } }, "Depot Breakdown"),
+        React.createElement("div", { style: { fontSize: 12, color: "var(--text-faint)" } },
+          allDepots.length, " depot", allDepots.length === 1 ? "" : "s", " · ", depotsInRange, " reporting in range")),
+      React.createElement("span", { style: { fontSize: 12, color: "var(--text-muted)", flexShrink: 0, marginLeft: 12 } }, tableOpen ? "Hide ▲" : "Show ▼")),
+    tableOpen && React.createElement(DataTable, {
       columns: isNational ? NATIONAL_COLUMNS : REGION_COLUMNS, rows: depotRows, rowKey: (r) => r.code, defaultSortKey: "pct", defaultSortDir: "asc",
       emptyMessage: "No depots on file yet.",
     }));
