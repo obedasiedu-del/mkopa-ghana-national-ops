@@ -9,8 +9,9 @@ import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { DailySubmissionOverview } from "../components/DailySubmissionOverview.js";
 import { DataTable } from "../components/DataTable.js";
 import { DirectAccuracySection } from "../components/DirectAccuracySection.js";
-import { fmtNum, fmtDateShort, REGION_ORDER, OTHER_SCOPES, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, trueAgePct } from "../lib/domain.js";
-import { depotsForScope, ledgerDevicesForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, psdsrStatsForScope, inventoryAccuracyStatsForScope, scScoreStatsForScope, indirectAccuracyStats } from "../lib/selectors.js";
+import { ViewingAsOfSection } from "../components/ViewingAsOfSection.js";
+import { fmtDateShort, REGION_ORDER, OTHER_SCOPES, STOCK_MOVEMENT_ENABLED } from "../lib/domain.js";
+import { depotsForScope, ledgerDevicesForScope, overviewStats, bucketMovementsByDay, haltStatusesForScope, indirectAccuracyStats } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
 const INDIRECT_ACCURACY_COLUMNS = [
@@ -97,16 +98,6 @@ export function RegionPage() {
   }
   const stats = overviewStats(data, region);
   const c = stats.ledgerCounts;
-  const wh = stats.warehousePendingCounts;
-  const agedTotal = stats.aged10Plus;
-  const agedPct = c.inTrade ? Math.round((agedTotal / c.inTrade) * 1000) / 10 : null;
-  const aged14Total = c.urgent;
-  const trueAge = trueAgePct(c);
-  const psdsr = psdsrStatsForScope(data, region);
-  const invAcc = inventoryAccuracyStatsForScope(data, region);
-  const scScore = scScoreStatsForScope(data, region);
-  const totalStock = stats.deviceTotal + c.total;
-  const fifo = stats.fifoCompliance;
   const userIsAdmin = isAdmin(auth.role);
   const depots = depotsForScope(data.depots, region);
   const regionDevices = React.useMemo(() => ledgerDevicesForScope(data.deviceLedger, data.depots, region), [data.deviceLedger, data.depots, region]);
@@ -144,23 +135,7 @@ export function RegionPage() {
         React.createElement("strong", null, haltedDepots.length, " depot", haltedDepots.length === 1 ? "" : "s", " on allocation halt"),
         " in ", region, " under ", haltPhase.label, " — aged stock (14d+) above the phase limit. ",
         React.createElement("button", { className: "btn btn-sm", style: { marginLeft: 6 }, onClick: () => goHalts(region) }, "View Halt Status Report →"))),
-    React.createElement("div", { className: "kpi-grid" },
-      React.createElement(KpiTile, { label: "Total Stock", value: fmtNum(totalStock), foot: "at depots + with DSRs" }),
-      React.createElement(KpiTile, { label: "Devices at Depots", value: fmtNum(stats.deviceTotal), foot: "from daily submissions" }),
-      React.createElement(KpiTile, { label: "Devices with DSRs", value: fmtNum(c.total), foot: "serial-level" }),
-      WAREHOUSE_PENDING_ENABLED && React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
-      React.createElement(KpiTile, { label: "Daily Submission Status", value: stats.submittedToday + "/" + stats.expectedSubmissions, foot: "depots with today's entry" }),
-      userIsAdmin && React.createElement(KpiTile, { label: "Stock Aging", value: agedPct === null ? "—" : agedPct + "%", foot: fmtNum(agedTotal) + " devices 10d+" }),
-      React.createElement(KpiTile, { label: "Aged 14d+", value: fmtNum(aged14Total), foot: "halt-policy threshold" }),
-      React.createElement(KpiTile, { label: "True Age", value: trueAge === null ? "—" : trueAge + "%", foot: "14d+ share of active (in-trade) stock" }),
-      React.createElement(KpiTile, { label: "PSDSR", value: psdsr.pct === null ? "—" : psdsr.pct + "%", foot: fmtNum(psdsr.depotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" }),
-      React.createElement(KpiTile, { label: "Inventory Accuracy", value: invAcc.pct === null ? "—" : invAcc.pct + "%", foot: fmtNum(invAcc.depotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" }),
-      React.createElement(KpiTile, { label: "SC Score", value: scScore.avg === null ? "—" : scScore.avg, foot: fmtNum(scScore.depotsScored) + "/" + fmtNum(stats.activeDepots) + " depots scored" }),
-      React.createElement(KpiTile, { label: "FIFO Compliance", value: fifo.pct === null ? "—" : fifo.pct + "%", foot: fmtNum(fifo.sold) + "/" + fmtNum(fifo.cohort) + " aged stock sold this week" }),
-      STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
-      React.createElement(KpiTile, { label: "Active Depots", value: fmtNum(stats.activeDepots), foot: (stats.totalDepots - stats.activeDepots) + " closed" }),
-      React.createElement(KpiTile, { label: "SC Coverage", value: stats.scFilled + "/" + stats.activeDepots, foot: stats.scVacant + " vacant" }),
-      React.createElement(KpiTile, { label: "Allocation Halts", value: fmtNum(haltedDepots.length), foot: haltPhase ? haltPhase.label + " active" : "policy not started" })),
+    React.createElement(ViewingAsOfSection, { scope: region, movements7d }),
     React.createElement("div", { style: { display: "flex", gap: 8, marginBottom: 16 } },
       STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => goMovements(region) }, "View Stock Movement Log →"),
       userIsAdmin && React.createElement("button", { className: "btn btn-sm", onClick: () => goAudit(region) }, "View Audit History →"),
