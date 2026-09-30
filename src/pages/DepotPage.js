@@ -34,6 +34,16 @@ export function DepotPage() {
 
   const canWrite = canWriteDepot(auth.role, rec.code, rec.region);
   const isSC = auth.role && (auth.role.role === "depot_controller" || auth.role.role === "cce");
+  // A CCE login is confined to her own Service Centre just like a Stock Controller (isSC,
+  // above) is confined to her own depot -- but her page only ever shows CCE things: no
+  // Stock Controller panel, no device/DSR tables, no Stock Movement/Daily Submission/Audit
+  // History tabs, none of which are hers to see or touch. An admin/regional manager/SC
+  // looking at the same depot still sees everything, CCE panel included.
+  const isCceUser = auth.role && auth.role.role === "cce";
+  // Symmetric to isCceUser: a plain Stock Controller login sees only SC things -- the
+  // Customer Care Executive panel and CCE KPI tiles are someone else's job, same reasoning
+  // as above. An admin/regional manager still sees both, for oversight.
+  const isScUser = auth.role && auth.role.role === "depot_controller";
   const haltPhase = activeHaltPhase();
   const haltStatus = haltPhase ? haltStatusForDepot(countsForDevices(ledgerDevices(data.deviceLedger, rec.code)), haltPhase) : null;
 
@@ -54,19 +64,60 @@ export function DepotPage() {
       React.createElement("div", null,
         React.createElement("div", { className: "scope-title" }, rec.name),
         React.createElement("div", { className: "scope-sub" }, rec.code, " · ", rec.region, rec.status === "closed" ? " · Closed" : "")),
-      React.createElement(ScStatusPill, { status: rec.scStatus })),
+      !isCceUser && React.createElement(ScStatusPill, { status: rec.scStatus })),
     React.createElement(HaltBanner, { status: haltStatus }),
-    React.createElement(Tabs, { tabs: DEPOT_TABS, active: tab, onChange: (id) => window.location.hash = "#/depot/" + encodeURIComponent(rec.code) + "/" + id }),
-    React.createElement("div", { style: { marginTop: 16 } },
-      tab === "devices" && React.createElement(DevicesTab, { rec, canWrite, isSC }),
-      tab === "submission" && React.createElement(SubmissionTab, { rec, canWrite }),
-      tab === "movement" && React.createElement(MovementTab, { rec, canWrite }),
-      tab === "warehouse" && React.createElement(WarehouseTab, { rec }),
-      tab === "audit" && React.createElement(AuditTab, { rec })));
+    isCceUser
+      ? React.createElement("div", { style: { marginTop: 16 } }, React.createElement(CceSection, { rec, canWrite }))
+      : React.createElement(React.Fragment, null,
+          React.createElement(Tabs, { tabs: DEPOT_TABS, active: tab, onChange: (id) => window.location.hash = "#/depot/" + encodeURIComponent(rec.code) + "/" + id }),
+          React.createElement("div", { style: { marginTop: 16 } },
+            tab === "devices" && React.createElement(DevicesTab, { rec, canWrite, isSC, isScUser }),
+            tab === "submission" && React.createElement(SubmissionTab, { rec, canWrite }),
+            tab === "movement" && React.createElement(MovementTab, { rec, canWrite }),
+            tab === "warehouse" && React.createElement(WarehouseTab, { rec }),
+            tab === "audit" && React.createElement(AuditTab, { rec }))));
+}
+
+/* ============ Customer Care Executive panel + CCE KPI tiles ============ */
+// Shared by DevicesTab (shown to admins/regional managers, hidden from a plain Stock
+// Controller login) and CceSection (the whole of what a CCE login sees on her own page).
+function CceCard({ rec, canWrite }) {
+  const { data, runAction } = useApp();
+  const [cceName, setCceName] = React.useState(rec.cceName);
+  const [ccePhone, setCcePhone] = React.useState(rec.ccePhone);
+  const [cceStatus, setCceStatus] = React.useState(rec.cceStatus);
+  const [cceNotes, setCceNotes] = React.useState(rec.cceNotes);
+  function saveCce() {
+    runAction(() => data.saveDepotField(rec.code, { cceName: cceName.trim(), ccePhone: ccePhone.trim(), cceStatus, cceNotes: cceNotes.trim() }), "Saved");
+  }
+  const cceRow = data.cceByDepot[rec.code];
+
+  return React.createElement(React.Fragment, null,
+    React.createElement("div", { className: "table-wrap", style: { padding: "14px 16px", marginBottom: 16 } },
+      React.createElement("div", { className: "drawer-section-title" }, "Customer Care Executive"),
+      React.createElement("div", { className: "field-grid" },
+        React.createElement(FieldInput, { label: "Name", value: cceName, onChange: setCceName }),
+        React.createElement(FieldInput, { label: "Phone", value: ccePhone, onChange: setCcePhone })),
+      React.createElement(FieldSelect, { label: "Status", value: cceStatus, onChange: setCceStatus, options: [["active", "Active"], ["leave", "On Leave"], ["vacant", "Vacant"]] }),
+      React.createElement(FieldTextarea, { label: "Notes", value: cceNotes, onChange: setCceNotes }),
+      canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveCce }, "Save Customer Care Executive")),
+    React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
+      React.createElement(KpiTile, { label: "Quality", value: cceRow && cceRow.qualityPct !== null ? cceRow.qualityPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
+      React.createElement(KpiTile, { label: "SLA Compliance", value: cceRow && cceRow.slaPct !== null ? cceRow.slaPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
+      React.createElement(KpiTile, { label: "Footfall", value: cceRow && cceRow.footfall !== null ? fmtNum(cceRow.footfall) : "—", foot: cceRow ? "latest week, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
+      React.createElement(KpiTile, {
+        label: "Inventory Accuracy", value: data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct + "%" : "—",
+        foot: data.inventoryAccuracyByDepot[rec.code] ? "latest, " + fmtDateShort(data.inventoryAccuracyByDepot[rec.code].periodDate) : "no entry yet",
+      })));
+}
+
+/* ============ A CCE login's whole page: just her own panel + KPIs ============ */
+function CceSection({ rec, canWrite }) {
+  return React.createElement(CceCard, { rec, canWrite });
 }
 
 /* ============ Devices: At Depot / With DSRs + Stock Controller ============ */
-function DevicesTab({ rec, canWrite, isSC }) {
+function DevicesTab({ rec, canWrite, isSC, isScUser }) {
   const { data, openModal, runAction } = useApp();
   const [sub, setSub] = React.useState("depot");
   const [scName, setScName] = React.useState(rec.scName);
@@ -76,15 +127,6 @@ function DevicesTab({ rec, canWrite, isSC }) {
   function saveSc() {
     runAction(() => data.saveDepotField(rec.code, { scName: scName.trim(), scPhone: scPhone.trim(), scStatus, scNotes: scNotes.trim() }), "Saved");
   }
-  const [cceName, setCceName] = React.useState(rec.cceName);
-  const [ccePhone, setCcePhone] = React.useState(rec.ccePhone);
-  const [cceStatus, setCceStatus] = React.useState(rec.cceStatus);
-  const [cceNotes, setCceNotes] = React.useState(rec.cceNotes);
-  function saveCce() {
-    runAction(() => data.saveDepotField(rec.code, { cceName: cceName.trim(), ccePhone: ccePhone.trim(), cceStatus, cceNotes: cceNotes.trim() }), "Saved");
-  }
-
-  const cceRow = data.cceByDepot[rec.code];
 
   const balances = data.stockBalances[rec.code] || {};
   const models = Object.keys(balances).sort();
@@ -108,22 +150,7 @@ function DevicesTab({ rec, canWrite, isSC }) {
         React.createElement(FieldSelect, { label: "Status", value: scStatus, onChange: setScStatus, options: [["active", "Active"], ["leave", "On Leave"], ["vacant", "Vacant"]] }),
         React.createElement(FieldTextarea, { label: "Notes", value: scNotes, onChange: setScNotes }),
         canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveSc }, "Save Stock Controller")),
-      React.createElement("div", { className: "table-wrap", style: { padding: "14px 16px", marginBottom: 16 } },
-        React.createElement("div", { className: "drawer-section-title" }, "Customer Care Executive"),
-        React.createElement("div", { className: "field-grid" },
-          React.createElement(FieldInput, { label: "Name", value: cceName, onChange: setCceName }),
-          React.createElement(FieldInput, { label: "Phone", value: ccePhone, onChange: setCcePhone })),
-        React.createElement(FieldSelect, { label: "Status", value: cceStatus, onChange: setCceStatus, options: [["active", "Active"], ["leave", "On Leave"], ["vacant", "Vacant"]] }),
-        React.createElement(FieldTextarea, { label: "Notes", value: cceNotes, onChange: setCceNotes }),
-        canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveCce }, "Save Customer Care Executive")),
-      React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-        React.createElement(KpiTile, { label: "Quality", value: cceRow && cceRow.qualityPct !== null ? cceRow.qualityPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
-        React.createElement(KpiTile, { label: "SLA Compliance", value: cceRow && cceRow.slaPct !== null ? cceRow.slaPct + "%" : "—", foot: cceRow ? "latest, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
-        React.createElement(KpiTile, { label: "Footfall", value: cceRow && cceRow.footfall !== null ? fmtNum(cceRow.footfall) : "—", foot: cceRow ? "latest week, " + fmtDateShort(cceRow.periodDate) : "no entry yet" }),
-        React.createElement(KpiTile, {
-          label: "Inventory Accuracy", value: data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct + "%" : "—",
-          foot: data.inventoryAccuracyByDepot[rec.code] ? "latest, " + fmtDateShort(data.inventoryAccuracyByDepot[rec.code].periodDate) : "no entry yet",
-        })),
+      !isScUser && React.createElement(CceCard, { rec, canWrite }),
       React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
         React.createElement(KpiTile, { label: "Devices at Depot", value: subTotals ? fmtNum(subTotals.totalStock) : "—", foot: latestSubmission ? "from daily submission · " + fmtDateShort(latestSubmission.date) : "no daily submission yet" }),
         React.createElement(KpiTile, { label: "Aged (11d+, reported)", value: subTotals ? fmtNum(subTotals.agedStock) : "—", foot: "self-reported in submission" }),
