@@ -38,6 +38,10 @@ export const LEDGER_TIERS = [
   { key: "aged", label: "Aging", min: 10, max: 13, cls: "pill-warning" },
   { key: "urgent", label: "Aged", min: 14, cls: "pill-critical" },
 ];
+// Maps a tier's pill class to the CSS variable that carries the same color, so any chart or
+// KPI tile that needs to color itself by tier (not just render a pill) stays in sync with
+// LEDGER_TIERS instead of hardcoding its own green/amber/red.
+export const LEDGER_TIER_COLOR_VAR = { "pill-success": "--success", "pill-warning": "--warning", "pill-critical": "--critical" };
 // The 5 movement categories from the approved architecture (Transfers, Receipts, Issues,
 // Returns, Status changes). A more specific reason (e.g. "allocated to DSR", "sold",
 // "damaged") goes in the movement's free-text reference under 'issue' rather than being

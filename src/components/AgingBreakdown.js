@@ -1,7 +1,7 @@
 "use strict";
 import React from "react";
 import { DataTable } from "./DataTable.js";
-import { LEDGER_TIERS, fmtNum, fmtDateShort, daysAllocated, agingDate, groupDevicesByTier } from "../lib/domain.js";
+import { LEDGER_TIERS, LEDGER_TIER_COLOR_VAR, fmtNum, fmtDateShort, daysAllocated, agingDate, groupDevicesByTier } from "../lib/domain.js";
 
 // Fresh/Aging/Aged tier breakdown -- click a tile to see its device list. Same interaction
 // as the Depot page's own Stock Aging tab, but for a Region or National scope's devices
@@ -32,7 +32,7 @@ export function AgingBreakdown({ devices, showDepotColumn }) {
         onClick: () => setActiveTier((a) => (a === t.key ? null : t.key)),
       },
         React.createElement("div", { className: "kpi-label" }, t.label),
-        React.createElement("div", { className: "kpi-value" }, fmtNum(groups[t.key].length)),
+        React.createElement("div", { className: "kpi-value", style: { color: `var(${LEDGER_TIER_COLOR_VAR[t.cls]})` } }, fmtNum(groups[t.key].length)),
         React.createElement("div", { className: "kpi-foot" }, t.min === undefined ? "0–" + t.max + " days" : t.max === undefined ? t.min + "+ days" : t.min + "–" + t.max + " days")))),
     activeTier && React.createElement(React.Fragment, null,
       React.createElement("div", { className: "drawer-section-title" }, LEDGER_TIERS.find((t) => t.key === activeTier).label, " devices"),

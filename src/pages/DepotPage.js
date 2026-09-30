@@ -7,7 +7,7 @@ import { DataTable } from "../components/DataTable.js";
 import { ledgerDevices, depotStockTotals, latestSubmissionForDepot } from "../lib/selectors.js";
 import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
-  SUBMISSION_MODELS, LEDGER_TIERS, submissionTotals, todayStr,
+  SUBMISSION_MODELS, LEDGER_TIERS, LEDGER_TIER_COLOR_VAR, submissionTotals, todayStr,
   fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices, trueAgePct, psdsrPct,
   groupDevicesByTier, downloadCsv, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED,
 } from "../lib/domain.js";
@@ -258,7 +258,7 @@ function AgingTab({ rec, isSC }) {
     React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
       tiers.map((t) => React.createElement("button", { key: t.key, className: "kpi-tile", style: { textAlign: "left", cursor: "pointer", outline: activeTier === t.key ? "2px solid var(--accent, #2a78d6)" : "none" }, onClick: () => setActiveTier((a) => (a === t.key ? null : t.key)) },
         React.createElement("div", { className: "kpi-label" }, t.label),
-        React.createElement("div", { className: "kpi-value" }, fmtNum(groups[t.key].length)),
+        React.createElement("div", { className: "kpi-value", style: { color: `var(${LEDGER_TIER_COLOR_VAR[t.cls]})` } }, fmtNum(groups[t.key].length)),
         React.createElement("div", { className: "kpi-foot" }, t.min === undefined ? "0–" + t.max + " days" : t.max === undefined ? t.min + "+ days" : t.min + "–" + t.max + " days")))),
     activeTier && React.createElement(React.Fragment, null,
       React.createElement("div", { className: "drawer-section-title" }, tiers.find((t) => t.key === activeTier).label, " devices"),
@@ -293,7 +293,7 @@ function WarehouseTab({ rec }) {
       React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
         LEDGER_TIERS.map((t) => React.createElement("button", { key: t.key, className: "kpi-tile", style: { textAlign: "left", cursor: "pointer", outline: activeTier === t.key ? "2px solid var(--accent, #2a78d6)" : "none" }, onClick: () => setActiveTier((a) => (a === t.key ? null : t.key)) },
           React.createElement("div", { className: "kpi-label" }, t.label),
-          React.createElement("div", { className: "kpi-value" }, fmtNum(groups[t.key].length)),
+          React.createElement("div", { className: "kpi-value", style: { color: `var(${LEDGER_TIER_COLOR_VAR[t.cls]})` } }, fmtNum(groups[t.key].length)),
           React.createElement("div", { className: "kpi-foot" }, t.min === undefined ? "0–" + t.max + " days" : t.max === undefined ? t.min + "+ days" : t.min + "–" + t.max + " days")))),
       activeTier && React.createElement(React.Fragment, null,
         React.createElement("div", { className: "drawer-section-title" }, LEDGER_TIERS.find((t) => t.key === activeTier).label, " devices"),
