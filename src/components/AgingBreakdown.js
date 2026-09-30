@@ -7,7 +7,7 @@ import { LEDGER_TIERS, LEDGER_TIER_COLOR_VAR, fmtNum, fmtDateShort, daysAllocate
 // as the Depot page's own Stock Aging tab, but for a Region or National scope's devices
 // (each tagged with depotCode/depotName by ledgerDevicesForScope), so a Depot column is
 // shown when the device list spans more than one depot.
-export function AgingBreakdown({ devices, showDepotColumn }) {
+export function AgingBreakdown({ devices, showDepotColumn, tiers = LEDGER_TIERS }) {
   const groups = React.useMemo(() => groupDevicesByTier(devices), [devices]);
   const [activeTier, setActiveTier] = React.useState(null);
   const shown = activeTier ? groups[activeTier] : [];
@@ -26,7 +26,7 @@ export function AgingBreakdown({ devices, showDepotColumn }) {
   }, [showDepotColumn]);
   return React.createElement(React.Fragment, null,
     React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-      LEDGER_TIERS.map((t) => React.createElement("button", {
+      tiers.map((t) => React.createElement("button", {
         key: t.key, className: "kpi-tile",
         style: { textAlign: "left", cursor: "pointer", outline: activeTier === t.key ? "2px solid var(--accent, #2a78d6)" : "none" },
         onClick: () => setActiveTier((a) => (a === t.key ? null : t.key)),
@@ -35,7 +35,7 @@ export function AgingBreakdown({ devices, showDepotColumn }) {
         React.createElement("div", { className: "kpi-value", style: { color: `var(${LEDGER_TIER_COLOR_VAR[t.cls]})` } }, fmtNum(groups[t.key].length)),
         React.createElement("div", { className: "kpi-foot" }, t.min === undefined ? "0–" + t.max + " days" : t.max === undefined ? t.min + "+ days" : t.min + "–" + t.max + " days")))),
     activeTier && React.createElement(React.Fragment, null,
-      React.createElement("div", { className: "drawer-section-title" }, LEDGER_TIERS.find((t) => t.key === activeTier).label, " devices"),
+      React.createElement("div", { className: "drawer-section-title" }, tiers.find((t) => t.key === activeTier).label, " devices"),
       React.createElement(DataTable, {
         columns, rows: shown, rowKey: (dv) => dv.serial + "|" + (dv.depotCode || ""), defaultSortKey: "allocatedDate",
         emptyMessage: "No devices in this tier.",

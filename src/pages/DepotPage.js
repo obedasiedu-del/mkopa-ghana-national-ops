@@ -2,8 +2,9 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { canWriteDepot } from "../data/useAuth.js";
-import { KpiTile, Pill, ScStatusPill, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, LedgerAgingBadge, HaltBanner } from "../components/ui.js";
+import { KpiTile, Pill, ScStatusPill, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, HaltBanner } from "../components/ui.js";
 import { DataTable } from "../components/DataTable.js";
+import { AgingBreakdown } from "../components/AgingBreakdown.js";
 import { ledgerDevices, depotStockTotals, latestSubmissionForDepot } from "../lib/selectors.js";
 import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
@@ -16,7 +17,6 @@ const DEPOT_TABS = [
   { id: "devices", label: "Devices" },
   { id: "submission", label: "Daily Submission" },
   ...(STOCK_MOVEMENT_ENABLED ? [{ id: "movement", label: "Stock Movement" }] : []),
-  { id: "aging", label: "Stock Aging" },
   ...(WAREHOUSE_PENDING_ENABLED ? [{ id: "warehouse", label: "Warehouse Stock" }] : []),
   { id: "audit", label: "Audit History" },
 ];
@@ -61,7 +61,6 @@ export function DepotPage() {
       tab === "devices" && React.createElement(DevicesTab, { rec, canWrite, isSC }),
       tab === "submission" && React.createElement(SubmissionTab, { rec, canWrite }),
       tab === "movement" && React.createElement(MovementTab, { rec, canWrite }),
-      tab === "aging" && React.createElement(AgingTab, { rec, isSC }),
       tab === "warehouse" && React.createElement(WarehouseTab, { rec }),
       tab === "audit" && React.createElement(AuditTab, { rec })));
 }
@@ -137,9 +136,6 @@ function DevicesTab({ rec, canWrite, isSC }) {
       : React.createElement(React.Fragment, null,
         React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
           React.createElement(KpiTile, { label: "Devices tracked", value: fmtNum(counts.total), foot: "with a DSR or resolved" }),
-          React.createElement(KpiTile, { label: "Fresh (0–9d)", value: fmtNum(counts.fresh), foot: "on track" }),
-          !isSC && React.createElement(KpiTile, { label: "Aged (10+d)", value: fmtNum(counts.aged + counts.urgent), foot: "needs attention" }),
-          React.createElement(KpiTile, { label: "14+ Days", value: fmtNum(counts.urgent), foot: "escalate now" }),
           React.createElement(KpiTile, { label: "True Age", value: trueAgePct(counts) === null ? "—" : trueAgePct(counts) + "%", foot: "14d+ share of active (in-trade) stock" }),
           React.createElement(KpiTile, {
             label: "PSDSR", value: psdsrPct(data.psdsrByDepot[rec.code]) === null ? "—" : psdsrPct(data.psdsrByDepot[rec.code]) + "%",
@@ -153,14 +149,9 @@ function DevicesTab({ rec, canWrite, isSC }) {
           React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("ledger", { depotCode: rec.code }) }, "Open device ledger →")),
         ledgerDvs.length === 0
           ? React.createElement("div", { className: "table-wrap" }, React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No devices with DSRs on file for this depot yet. Use \"Open device ledger\" to paste a baseline."))
-          : React.createElement("div", { className: "table-wrap" },
-            React.createElement("table", null,
-              React.createElement("thead", null, React.createElement("tr", null,
-                React.createElement("th", null, "Serial"), React.createElement("th", null, "Product"), React.createElement("th", null, "DSR"), React.createElement("th", null, "Aging / Status"))),
-              React.createElement("tbody", null, ledgerDvs.slice(0, 50).map((dv) => React.createElement("tr", { key: dv.serial },
-                React.createElement("td", { className: "mono" }, dv.serial), React.createElement("td", null, dv.model || "—"),
-                React.createElement("td", null, dv.dsrName || "—"), React.createElement("td", null, React.createElement(LedgerAgingBadge, { device: dv }))))))),
-        ledgerDvs.length > 50 && React.createElement("div", { style: { fontSize: 11.5, color: "var(--text-faint)", marginTop: 6 } }, "Showing 50 of ", ledgerDvs.length, " — open the full device ledger to see the rest.")));
+          : React.createElement(React.Fragment, null,
+            React.createElement("div", { className: "section-heading" }, "Devices with DSRs — by age"),
+            React.createElement(AgingBreakdown, { devices: ledgerDvs, tiers: isSC ? LEDGER_TIERS.filter((t) => t.key !== "aged") : LEDGER_TIERS }))));
 }
 
 /* ============ Daily Submission ============ */
@@ -245,36 +236,6 @@ function MovementTab({ rec, canWrite }) {
         emptyMessage: "No movements recorded yet for this depot.",
       }));
 }
-
-/* ============ Stock Aging ============ */
-function AgingTab({ rec, isSC }) {
-  const { data } = useApp();
-  const devices = ledgerDevices(data.deviceLedger, rec.code);
-  const groups = groupDevicesByTier(devices);
-  const tiers = isSC ? LEDGER_TIERS.filter((t) => t.key !== "aged") : LEDGER_TIERS;
-  const [activeTier, setActiveTier] = React.useState(null);
-  const shown = activeTier ? groups[activeTier] : [];
-  return React.createElement(React.Fragment, null,
-    React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-      tiers.map((t) => React.createElement("button", { key: t.key, className: "kpi-tile", style: { textAlign: "left", cursor: "pointer", outline: activeTier === t.key ? "2px solid var(--accent, #2a78d6)" : "none" }, onClick: () => setActiveTier((a) => (a === t.key ? null : t.key)) },
-        React.createElement("div", { className: "kpi-label" }, t.label),
-        React.createElement("div", { className: "kpi-value", style: { color: `var(${LEDGER_TIER_COLOR_VAR[t.cls]})` } }, fmtNum(groups[t.key].length)),
-        React.createElement("div", { className: "kpi-foot" }, t.min === undefined ? "0–" + t.max + " days" : t.max === undefined ? t.min + "+ days" : t.min + "–" + t.max + " days")))),
-    activeTier && React.createElement(React.Fragment, null,
-      React.createElement("div", { className: "drawer-section-title" }, tiers.find((t) => t.key === activeTier).label, " devices"),
-      React.createElement(DataTable, {
-        columns: AGING_COLUMNS, rows: shown, rowKey: (dv) => dv.serial, defaultSortKey: "allocatedDate",
-        emptyMessage: "No devices in this tier.",
-      })),
-    !activeTier && React.createElement("div", { style: { fontSize: 12.5, color: "var(--text-faint)" } }, "Click a tier above to see its devices."));
-}
-const AGING_COLUMNS = [
-  { key: "serial", label: "Serial", sortable: true, render: (dv) => React.createElement("span", { className: "mono" }, dv.serial) },
-  { key: "model", label: "Product", sortable: true, render: (dv) => dv.model || "—" },
-  { key: "dsrName", label: "DSR", sortable: true, render: (dv) => dv.dsrName || "—" },
-  { key: "allocatedDate", label: "In Channel Since", sortable: true, sortValue: (dv) => agingDate(dv), render: (dv) => fmtDateShort(agingDate(dv)) },
-  { key: "days", label: "Days", numeric: true, sortable: true, sortValue: (dv) => daysAllocated(agingDate(dv)), render: (dv) => daysAllocated(agingDate(dv)) },
-];
 
 /* ============ Warehouse Stock ============ */
 // Same tier breakdown as Stock Aging (FIFO days since the export's own "date current state
