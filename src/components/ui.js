@@ -13,7 +13,7 @@ export function KpiTile({ label, value, foot }) {
 // and a trend sparkline -- an opt-in upgrade of KpiTile used where daily snapshot history is
 // available (currently just the National page). badge/deltaText/sparkPoints are all optional
 // so a card can render with only the fields its caller actually has.
-export function KpiCard({ label, value, foot, badge, deltaText, sparkPoints }) {
+export function KpiCard({ label, value, foot, badge, deltaText, sparkPoints, sparkDates, isPct }) {
   const sparkColor = badge && badge.cls === "pill-critical" ? "var(--critical)" : "var(--success)";
   return React.createElement("div", { className: "kpi-tile" },
     React.createElement("div", { className: "kpi-card-top" },
@@ -22,7 +22,7 @@ export function KpiCard({ label, value, foot, badge, deltaText, sparkPoints }) {
     React.createElement("div", { className: "kpi-value" }, value),
     React.createElement("div", { className: "kpi-foot" }, foot),
     deltaText && React.createElement("div", { className: "kpi-delta" }, deltaText),
-    sparkPoints && React.createElement(Sparkline, { points: sparkPoints, color: sparkColor }));
+    sparkPoints && React.createElement(Sparkline, { points: sparkPoints, dates: sparkDates, color: sparkColor, isPct }));
 }
 export function Pill({ cls, children }) {
   return React.createElement("span", { className: "pill " + cls },

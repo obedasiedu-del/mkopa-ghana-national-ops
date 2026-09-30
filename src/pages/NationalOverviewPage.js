@@ -83,14 +83,16 @@ export function NationalOverviewPage() {
   const deltaMetrics = snapshotByDate[addDaysStr(viewDate, -SNAPSHOT_DELTA_DAYS)] || null;
   function buildSparkline(key) {
     const fromDate = addDaysStr(viewDate, -(SNAPSHOT_RANGE_DAYS - 1));
-    const out = [];
+    const points = [];
+    const dates = [];
     for (let i = 0; i < SNAPSHOT_RANGE_DAYS; i++) {
       const d = addDaysStr(fromDate, i);
-      if (isToday && d === viewDate) { out.push(liveMetrics[key] ?? null); continue; }
+      dates.push(d);
+      if (isToday && d === viewDate) { points.push(liveMetrics[key] ?? null); continue; }
       const m = snapshotByDate[d];
-      out.push(m ? (m[key] ?? null) : null);
+      points.push(m ? (m[key] ?? null) : null);
     }
-    return out;
+    return { points, dates };
   }
   function cardExtras(key) {
     const value = dm ? dm[key] : null;
@@ -98,7 +100,8 @@ export function NationalOverviewPage() {
     const past = deltaMetrics ? deltaMetrics[key] : null;
     const diff = value !== null && value !== undefined && past !== null && past !== undefined ? value - past : null;
     const deltaText = diff !== null ? kpiDeltaText(diff, !!KPI_PCT_METRICS[key], SNAPSHOT_DELTA_DAYS) : null;
-    return { badge, deltaText, sparkPoints: buildSparkline(key) };
+    const spark = buildSparkline(key);
+    return { badge, deltaText, sparkPoints: spark.points, sparkDates: spark.dates, isPct: !!KPI_PCT_METRICS[key] };
   }
   const onTargetCount = dm ? SNAPSHOT_TARGET_KEYS.filter((k) => kpiBadge(k, dm[k]).cls === "pill-success").length : 0;
   const offTargetCount = dm ? SNAPSHOT_TARGET_KEYS.filter((k) => kpiBadge(k, dm[k]).cls === "pill-critical").length : 0;
