@@ -5,6 +5,7 @@ import { canWriteDepot } from "../data/useAuth.js";
 import { KpiTile, Pill, ScStatusPill, FieldInput, FieldSelect, FieldTextarea, Tabs, Breadcrumb, HaltBanner } from "../components/ui.js";
 import { DataTable } from "../components/DataTable.js";
 import { AgingBreakdown } from "../components/AgingBreakdown.js";
+import { DepotViewingAsOfSection } from "../components/DepotViewingAsOfSection.js";
 import { ledgerDevices, depotStockTotals, latestSubmissionForDepot } from "../lib/selectors.js";
 import { activeHaltPhase, haltStatusForDepot } from "../lib/haltPolicy.js";
 import {
@@ -69,9 +70,10 @@ export function DepotPage() {
     isCceUser
       ? React.createElement("div", { style: { marginTop: 16 } }, React.createElement(CceSection, { rec, canWrite }))
       : React.createElement(React.Fragment, null,
+          !rec.isSynthetic && React.createElement(DepotViewingAsOfSection, { rec }),
           React.createElement(Tabs, { tabs: DEPOT_TABS, active: tab, onChange: (id) => window.location.hash = "#/depot/" + encodeURIComponent(rec.code) + "/" + id }),
           React.createElement("div", { style: { marginTop: 16 } },
-            tab === "devices" && React.createElement(DevicesTab, { rec, canWrite, isSC, isScUser }),
+            tab === "devices" && React.createElement(DevicesTab, { rec, canWrite, isScUser }),
             tab === "submission" && React.createElement(SubmissionTab, { rec, canWrite }),
             tab === "movement" && React.createElement(MovementTab, { rec, canWrite }),
             tab === "warehouse" && React.createElement(WarehouseTab, { rec }),
@@ -118,7 +120,7 @@ function CceSection({ rec, canWrite }) {
 }
 
 /* ============ Devices: At Depot / With DSRs + Stock Controller ============ */
-function DevicesTab({ rec, canWrite, isSC, isScUser }) {
+function DevicesTab({ rec, canWrite, isScUser }) {
   const { data, openModal, runAction } = useApp();
   const [sub, setSub] = React.useState("depot");
   const [scName, setScName] = React.useState(rec.scName);
@@ -204,7 +206,7 @@ function DevicesTab({ rec, canWrite, isSC, isScUser }) {
           ? React.createElement("div", { className: "table-wrap" }, React.createElement("div", { style: { padding: 20, color: "var(--text-faint)", fontSize: 12.5 } }, "No devices with DSRs on file for this depot yet. Use \"Open device ledger\" to paste a baseline."))
           : React.createElement(React.Fragment, null,
             React.createElement("div", { className: "section-heading" }, "Devices with DSRs — by age"),
-            React.createElement(AgingBreakdown, { devices: ledgerDvs, tiers: isSC ? LEDGER_TIERS.filter((t) => t.key !== "aged") : LEDGER_TIERS }))));
+            React.createElement(AgingBreakdown, { devices: ledgerDvs, tiers: LEDGER_TIERS }))));
 }
 
 /* ============ Daily Submission ============ */
