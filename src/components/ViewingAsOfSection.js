@@ -109,13 +109,13 @@ export function ViewingAsOfSection({ scope, movements7d }) {
       userIsAdmin && React.createElement(KpiCard, { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", ...cardExtras("agedPct") }),
       React.createElement(KpiCard, {
         label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—",
-        foot: isToday ? fmtNum(stats.fifoDaily.sold) + " sold today (of " + fmtNum(stats.fifoDaily.cohort) + " aged since yesterday)" : "halt-policy threshold",
+        foot: "halt-policy threshold",
         ...cardExtras("aged14Total"),
       }),
       React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: dm ? fmtNum(dm.psdsrDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("psdsrPct") }),
       React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: dm ? fmtNum(dm.inventoryAccuracyDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("inventoryAccuracyPct") }),
-      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold this week" : "", ...cardExtras("fifoPct") }),
+      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", ...cardExtras("fifoPct") }),
       React.createElement(KpiCard, { label: "Active Depots", value: dm ? fmtNum(dm.activeDepots) : "—", foot: dm ? (dm.totalDepots - dm.activeDepots) + " closed" : "", ...cardExtras("activeDepots") }),
       React.createElement(KpiCard, { label: "SC Coverage", value: dm ? dm.scFilled + "/" + dm.activeDepots : "—", foot: dm ? dm.scVacant + " vacant" : "", ...cardExtras("scCoveragePct") }),
       React.createElement(KpiCard, { label: "Allocation Halts", value: dm ? fmtNum(dm.haltedCount) : "—", foot: haltPhase ? haltPhase.label + " active" : "policy not started", ...cardExtras("haltedCount") })));
