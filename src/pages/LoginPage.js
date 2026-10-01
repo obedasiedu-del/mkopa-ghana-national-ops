@@ -23,7 +23,7 @@ export function LoginPage() {
       React.createElement("div", { className: "brand-mark" },
         React.createElement("div", { className: "brand-icon" }, "GH"),
         React.createElement("div", null,
-          React.createElement("div", { className: "brand-title" }, "National Retail Ops"),
+          React.createElement("div", { className: "brand-title" }, "National Retail OPS"),
           React.createElement("div", { className: "brand-sub" }, "M-KOPA Ghana"))),
       React.createElement("form", { onSubmit: submit },
         error && React.createElement("div", { className: "auth-error" }, error),
