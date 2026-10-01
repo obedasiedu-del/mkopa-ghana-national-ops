@@ -83,6 +83,11 @@ export function overviewStats(data, scope) {
   let ledgerCounts = { total: 0, inTrade: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
   let aged10Plus = 0;
   let fifoCohort = 0, fifoSold = 0;
+  // Same idea as the weekly fifoCompliance below, just windowDays=1 -- devices that were
+  // already aged as of yesterday, and how many of those have sold since (effectively "today's
+  // FIFO clearing"). This is the daily companion to "Aged 14d+" Marvin asked for: a fresh
+  // number every morning, not smoothed into a week like the main FIFO Compliance % is.
+  let fifoCohortToday = 0, fifoSoldToday = 0;
   ledgerDepots.forEach((d) => {
     const devices = ledgerDevices(data.deviceLedger, d.code);
     const c = countsForDevices(devices);
@@ -91,8 +96,12 @@ export function overviewStats(data, scope) {
     const fifo = fifoComplianceStats(devices);
     fifoCohort += fifo.cohort;
     fifoSold += fifo.sold;
+    const fifoToday = fifoComplianceStats(devices, 1);
+    fifoCohortToday += fifoToday.cohort;
+    fifoSoldToday += fifoToday.sold;
   });
   const fifoCompliance = { cohort: fifoCohort, sold: fifoSold, pct: fifoCohort ? Math.round((fifoSold / fifoCohort) * 1000) / 10 : null };
+  const fifoDaily = { cohort: fifoCohortToday, sold: fifoSoldToday };
   const today = todayStr();
   let submittedToday = 0;
   active.forEach((d) => {
@@ -107,7 +116,7 @@ export function overviewStats(data, scope) {
   return {
     activeDepots: active.length, totalDepots: depots.length,
     scFilled: filled.length, scVacant: active.length - filled.length,
-    deviceTotal, ledgerCounts, aged10Plus, warehousePendingCounts, fifoCompliance,
+    deviceTotal, ledgerCounts, aged10Plus, warehousePendingCounts, fifoCompliance, fifoDaily,
     submittedToday, expectedSubmissions: active.length,
   };
 }

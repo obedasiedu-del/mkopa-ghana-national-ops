@@ -107,7 +107,11 @@ export function ViewingAsOfSection({ scope, movements7d }) {
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null || movements7d === undefined ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiCard, { label: "Daily Submission Status", value: dm ? dm.submittedToday + "/" + dm.expectedSubmissions : "—", foot: "depots with today's entry", ...cardExtras("submissionPct") }),
       userIsAdmin && React.createElement(KpiCard, { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", ...cardExtras("agedPct") }),
-      React.createElement(KpiCard, { label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—", foot: "halt-policy threshold", ...cardExtras("aged14Total") }),
+      React.createElement(KpiCard, {
+        label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—",
+        foot: isToday ? fmtNum(stats.fifoDaily.sold) + " sold today (of " + fmtNum(stats.fifoDaily.cohort) + " aged since yesterday)" : "halt-policy threshold",
+        ...cardExtras("aged14Total"),
+      }),
       React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: dm ? fmtNum(dm.psdsrDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("psdsrPct") }),
       React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: dm ? fmtNum(dm.inventoryAccuracyDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("inventoryAccuracyPct") }),
