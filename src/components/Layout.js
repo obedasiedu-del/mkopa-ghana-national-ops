@@ -17,7 +17,7 @@ function Sidebar() {
       React.createElement("div", { className: "brand-mark" },
         React.createElement("div", { className: "brand-icon" }, "GH"),
         React.createElement("div", null,
-          React.createElement("div", { className: "brand-title" }, "National Stock Ops"),
+          React.createElement("div", { className: "brand-title" }, "National Retail Ops"),
           React.createElement("div", { className: "brand-sub" }, "M-KOPA Ghana"))),
     ),
     // A Stock Controller only ever has her own depot(s) to navigate between -- almost always
