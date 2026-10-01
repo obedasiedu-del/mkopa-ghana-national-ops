@@ -3,8 +3,11 @@ import React from "react";
 import { daysAllocated, ledgerTierFor, agingDate } from "../lib/domain.js";
 import { Sparkline } from "./charts/Sparkline.js";
 
-export function KpiTile({ label, value, foot, badge }) {
-  return React.createElement("div", { className: "kpi-tile" },
+export function KpiTile({ label, value, foot, badge, onClick }) {
+  return React.createElement("div", {
+    className: "kpi-tile" + (onClick ? " kpi-tile-clickable" : ""),
+    onClick, role: onClick ? "button" : undefined, tabIndex: onClick ? 0 : undefined,
+  },
     badge
       ? React.createElement("div", { className: "kpi-card-top" },
           React.createElement("div", { className: "kpi-label" }, label),
@@ -17,9 +20,12 @@ export function KpiTile({ label, value, foot, badge }) {
 // and a trend sparkline -- an opt-in upgrade of KpiTile used where daily snapshot history is
 // available (currently just the National page). badge/deltaText/sparkPoints are all optional
 // so a card can render with only the fields its caller actually has.
-export function KpiCard({ label, value, foot, badge, deltaText, sparkPoints, sparkDates, isPct }) {
+export function KpiCard({ label, value, foot, badge, deltaText, sparkPoints, sparkDates, isPct, onClick }) {
   const sparkColor = badge && badge.cls === "pill-critical" ? "var(--critical)" : "var(--success)";
-  return React.createElement("div", { className: "kpi-tile" },
+  return React.createElement("div", {
+    className: "kpi-tile" + (onClick ? " kpi-tile-clickable" : ""),
+    onClick, role: onClick ? "button" : undefined, tabIndex: onClick ? 0 : undefined,
+  },
     React.createElement("div", { className: "kpi-card-top" },
       React.createElement("div", { className: "kpi-label" }, label),
       badge && React.createElement(Pill, { cls: badge.cls }, badge.label)),

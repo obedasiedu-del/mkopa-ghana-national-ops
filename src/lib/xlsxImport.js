@@ -79,12 +79,12 @@ export function readWarehouseStockSheet(wb, sheetName) {
   return { textRows, totalRows };
 }
 
-// Same idea for the PSDSR weekly export -- prefer a sheet named for it, else sniff for its
-// distinctive "Total PDSR" / "Sufficient Stocks" header pair (the real export's first-column
-// header is an arbitrary leftover label, not something reliably named, so it's never used to
-// identify the sheet).
+// Same idea for the PSDSR daily export -- prefer a sheet named for it (the real file calls
+// it "Last_7_Days"), else sniff for its distinctive SalesAgentId/ShopName header pair (the
+// real export's other column headers are stable too, but SalesAgentId alone is enough to
+// identify it and never appears on an unrelated sheet).
 export function guessPsdsrSheet(wb) {
-  const byName = wb.SheetNames.find((n) => /psdsr/i.test(n));
+  const byName = wb.SheetNames.find((n) => /last.?7.?days|psdsr/i.test(n));
   if (byName) return byName;
   const byHeader = wb.SheetNames.find((n) => sheetLooksLikePsdsr(wb, n));
   return byHeader || wb.SheetNames[0];
@@ -93,34 +93,45 @@ function findPsdsrHeaderRow(wb, sheetName) {
   const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: "", blankrows: false });
   const idx = aoa.findIndex((row) => {
     const norm = row.map(normalizeHeader);
-    return norm.some((h) => /total.*pdsr|pdsr.*total/.test(h)) && norm.some((h) => h.indexOf("sufficient") !== -1);
+    return norm.some((h) => h.replace(/\s+/g, "") === "salesagentid") && norm.some((h) => h.replace(/\s+/g, "") === "shopname");
   });
   return { aoa, idx };
 }
 export function sheetLooksLikePsdsr(wb, sheetName) {
   return findPsdsrHeaderRow(wb, sheetName).idx !== -1;
 }
-// A PSDSR export's header row isn't necessarily row 1 -- the real file has blank leading
-// rows -- so this scans down for the "Total PDSR"/"Sufficient..." row and treats everything
-// below it as data, converting straight into the same tab-separated Depot/Total/Sufficient
-// text parsePsdsrPaste() already knows how to read (the depot name is always the first
-// column in the real export, whatever its own header text happens to say).
+// The real export's header row is row 1 with no leading blanks, but this scans anyway in
+// case a future export adds a title row above it. Columns are located by name (not fixed
+// position) so a reordered export still reads correctly; the four unused/unlabeled trailing
+// columns the real file carries (Column1, Column2, two blanks) are simply never referenced.
+// Converts straight into the same tab-separated text parsePsdsrDailyPaste() reads, in its
+// expected column order: SalesAgentId, FullName, PhoneNumber, AcquisitionSalesL7, QoSOnDay,
+// ShopName, Stock Yesterday.
 export function readPsdsrSheet(wb, sheetName) {
   const { aoa, idx: headerIdx } = findPsdsrHeaderRow(wb, sheetName);
-  if (headerIdx === -1) throw new Error('Could not find "Total PDSR" / "Sufficient Stocks" columns on sheet "' + sheetName + '".');
-  const header = aoa[headerIdx].map(normalizeHeader);
-  const totalIdx = header.findIndex((h) => /total.*pdsr|pdsr.*total/.test(h));
-  const suffIdx = header.findIndex((h) => h.indexOf("sufficient") !== -1);
+  if (headerIdx === -1) throw new Error('Could not find "SalesAgentId" / "ShopName" columns on sheet "' + sheetName + '".');
+  const header = aoa[headerIdx].map(normalizeHeader).map((h) => h.replace(/\s+/g, ""));
+  const idOf = (name) => header.findIndex((h) => h === name);
+  const idIdx = idOf("salesagentid");
+  const nameIdx = idOf("fullname");
+  const phoneIdx = idOf("phonenumber");
+  const salesIdx = idOf("acquisitionsalesl7");
+  const qosIdx = idOf("qosonday");
+  const shopIdx = idOf("shopname");
+  const stockIdx = idOf("stockyesterday");
   const textRows = [];
   let totalRows = 0;
   for (let i = headerIdx + 1; i < aoa.length; i++) {
     const row = aoa[i];
-    const depot = row[0];
-    const totalNum = Number(row[totalIdx]);
-    if (!depot || !Number.isFinite(totalNum)) continue;
+    const id = row[idIdx];
+    const name = row[nameIdx];
+    if (!id || !name) continue; // drops stray keystroke/autofill junk rows the real file carries
     totalRows++;
-    const suffNum = Number(row[suffIdx]);
-    textRows.push(String(depot).trim() + "\t" + totalNum + "\t" + (Number.isFinite(suffNum) ? suffNum : 0));
+    textRows.push([
+      String(id).trim(), String(name).trim(), phoneIdx !== -1 ? String(row[phoneIdx] ?? "").trim() : "",
+      salesIdx !== -1 ? Number(row[salesIdx]) || 0 : 0, qosIdx !== -1 ? row[qosIdx] ?? "" : "",
+      shopIdx !== -1 ? String(row[shopIdx] ?? "").trim() : "", stockIdx !== -1 ? Number(row[stockIdx]) || 0 : 0,
+    ].join("\t"));
   }
   return { textRows, totalRows };
 }

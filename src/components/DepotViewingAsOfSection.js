@@ -17,7 +17,7 @@ const SNAPSHOT_TARGET_KEYS = ["trueAgePct", "psdsrPct", "inventoryAccuracyPct"];
 // Depots/Allocation Halts/FIFO -- those are scope-wide concepts that don't mean anything for
 // a single depot, and the halt banner above already covers this depot's own halt status).
 export function DepotViewingAsOfSection({ rec }) {
-  const { data } = useApp();
+  const { data, openModal } = useApp();
   const ledgerDvs = ledgerDevices(data.deviceLedger, rec.code);
   const counts = countsForDevices(ledgerDvs);
   const latestSubmission = latestSubmissionForDepot(data.submissionsByDepot, rec.code);
@@ -102,6 +102,6 @@ export function DepotViewingAsOfSection({ rec }) {
       React.createElement(KpiCard, { label: "Devices with DSRs", value: dm ? fmtNum(dm.dsrTotal) : "—", foot: "serial-level", ...cardExtras("dsrTotal") }),
       React.createElement(KpiCard, { label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—", foot: "halt-policy threshold", ...cardExtras("aged14Total") }),
       React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
-      React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry" : "no entry yet", ...cardExtras("psdsrPct") }),
+      React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry · tap for names" : "no entry yet", onClick: () => openModal("psdsrDetail", { depotCode: rec.code }), ...cardExtras("psdsrPct") }),
       React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: invAcc ? "latest entry" : "no entry yet", ...cardExtras("inventoryAccuracyPct") })));
 }

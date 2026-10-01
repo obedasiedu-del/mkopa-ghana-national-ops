@@ -194,7 +194,8 @@ function DevicesTab({ rec, canWrite, isScUser }) {
           React.createElement(KpiTile, { label: "True Age", value: trueAgePct(counts) === null ? "—" : trueAgePct(counts) + "%", foot: "14d+ share of active (in-trade) stock" }),
           React.createElement(KpiTile, {
             label: "PSDSR", value: psdsrPct(data.psdsrByDepot[rec.code]) === null ? "—" : psdsrPct(data.psdsrByDepot[rec.code]) + "%",
-            foot: data.psdsrByDepot[rec.code] ? fmtDateShort(data.psdsrByDepot[rec.code].periodDate) : "no entry yet",
+            foot: data.psdsrByDepot[rec.code] ? fmtDateShort(data.psdsrByDepot[rec.code].periodDate) + " · tap for names" : "no entry yet",
+            onClick: () => openModal("psdsrDetail", { depotCode: rec.code }),
           }),
           React.createElement(KpiTile, {
             label: "Inventory Accuracy", value: data.inventoryAccuracyByDepot[rec.code] ? data.inventoryAccuracyByDepot[rec.code].pct + "%" : "—",

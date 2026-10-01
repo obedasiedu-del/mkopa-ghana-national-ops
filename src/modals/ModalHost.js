@@ -7,6 +7,7 @@ import { BulkLedgerModal } from "./BulkLedgerModal.js";
 import { BulkWarehouseStockModal } from "./BulkWarehouseStockModal.js";
 import { BulkDepotStockModal } from "./BulkDepotStockModal.js";
 import { BulkPsdsrModal } from "./BulkPsdsrModal.js";
+import { PsdsrDetailModal } from "./PsdsrDetailModal.js";
 import { BulkInventoryAccuracyModal } from "./BulkInventoryAccuracyModal.js";
 import { BulkCcePerformanceModal } from "./BulkCcePerformanceModal.js";
 import { BulkIndirectAccuracyModal } from "./BulkIndirectAccuracyModal.js";
@@ -26,6 +27,7 @@ export function ModalHost() {
     case "bulkWarehouseStock": return React.createElement(BulkWarehouseStockModal, { ...modal.props });
     case "bulkDepotStock": return React.createElement(BulkDepotStockModal, { ...modal.props });
     case "bulkPsdsr": return React.createElement(BulkPsdsrModal, { ...modal.props });
+    case "psdsrDetail": return React.createElement(PsdsrDetailModal, { ...modal.props });
     case "bulkInventoryAccuracy": return React.createElement(BulkInventoryAccuracyModal, { ...modal.props });
     case "bulkCcePerformance": return React.createElement(BulkCcePerformanceModal, { ...modal.props });
     case "bulkIndirectAccuracy": return React.createElement(BulkIndirectAccuracyModal, { ...modal.props });

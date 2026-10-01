@@ -11,20 +11,23 @@ const PAGE_SIZE = 1000;
 // (70+ sequential round trips collapse to ~9 batches) without overwhelming the pooler.
 const FETCH_CONCURRENCY = 8;
 
-function buildPageQuery(table, orderCol, from) {
+function buildPageQuery(table, orderCol, from, filterFn) {
   let q = supabaseClient.from(table).select("*").range(from, from + PAGE_SIZE - 1);
+  if (filterFn) q = filterFn(q);
   if (orderCol) q = q.order(orderCol, { ascending: true });
   return q;
 }
-async function fetchAll(table, orderCol) {
-  const { count, error: countErr } = await supabaseClient.from(table).select("*", { count: "exact", head: true });
+async function fetchAll(table, orderCol, filterFn) {
+  let countQ = supabaseClient.from(table).select("*", { count: "exact", head: true });
+  if (filterFn) countQ = filterFn(countQ);
+  const { count, error: countErr } = await countQ;
   if (countErr) throw countErr;
   const total = count || 0;
   if (total === 0) return [];
   const pageCount = Math.ceil(total / PAGE_SIZE);
   const pageRows = new Array(pageCount);
   await runWithConcurrency(Array.from({ length: pageCount }, (_, p) => p), FETCH_CONCURRENCY, async (p) => {
-    const { data, error } = await buildPageQuery(table, orderCol, p * PAGE_SIZE);
+    const { data, error } = await buildPageQuery(table, orderCol, p * PAGE_SIZE, filterFn);
     if (error) throw error;
     pageRows[p] = data || [];
   });
@@ -62,6 +65,7 @@ export function useAppData() {
   const [deviceLedger, setDeviceLedger] = React.useState({});
   const [warehousePending, setWarehousePending] = React.useState({});
   const [psdsrByDepot, setPsdsrByDepot] = React.useState({});
+  const [psdsrDsrsByDepot, setPsdsrDsrsByDepot] = React.useState({});
   const [inventoryAccuracyByDepot, setInventoryAccuracyByDepot] = React.useState({});
   const [inventoryAccuracyHistory, setInventoryAccuracyHistory] = React.useState([]);
   const [cceByDepot, setCceByDepot] = React.useState({});
@@ -131,13 +135,34 @@ export function useAppData() {
   }, []);
   // Latest weekly PSDSR entry per depot (period_date ascending, so later rows overwrite
   // earlier ones -- the map ends up holding just the most recent week per depot).
+  // One row per DSR per upload day now (psdsr_daily), not one aggregate row per depot per
+  // week -- fetching the whole table would grow unbounded (every DSR, every day, forever),
+  // so this only ever pulls the single most recent upload_date's rows: find that date, then
+  // fetch just its rows. psdsrByDepot keeps the same {total, sufficient, periodDate,
+  // enteredBy} shape every existing KPI tile already reads (total/sufficient now counted
+  // from the fetched rows); psdsrDsrsByDepot is the new per-DSR list the detail pop-up reads.
   const refreshPsdsr = React.useCallback(async () => {
-    const rows = await fetchAll("psdsr_weekly", "period_date");
-    const map = {};
+    const { data: latest, error: latestErr } = await supabaseClient
+      .from("psdsr_daily").select("upload_date").order("upload_date", { ascending: false }).limit(1);
+    if (latestErr) throw latestErr;
+    const latestDate = latest && latest[0] ? latest[0].upload_date : null;
+    if (!latestDate) { setPsdsrByDepot({}); setPsdsrDsrsByDepot({}); return; }
+    const rows = await fetchAll("psdsr_daily", "full_name", (q) => q.eq("upload_date", latestDate));
+    const byDepot = {}, dsrMap = {};
     rows.forEach((r) => {
-      map[r.depot_code] = { total: r.total_pdsr, sufficient: r.sufficient_stocks, periodDate: r.period_date, enteredBy: r.entered_by || "" };
+      if (!dsrMap[r.depot_code]) dsrMap[r.depot_code] = [];
+      dsrMap[r.depot_code].push({
+        salesAgentId: r.sales_agent_id, fullName: r.full_name, phoneNumber: r.phone_number || "",
+        acquisitionSalesL7: r.acquisition_sales_l7, qosOnDay: r.qos_on_day === null ? null : Number(r.qos_on_day),
+        stockYesterday: r.stock_yesterday, isProductive: r.is_productive, isSufficient: r.is_sufficient,
+      });
+      if (!r.is_productive) return;
+      if (!byDepot[r.depot_code]) byDepot[r.depot_code] = { total: 0, sufficient: 0, periodDate: r.upload_date, enteredBy: r.entered_by || "" };
+      byDepot[r.depot_code].total++;
+      if (r.is_sufficient) byDepot[r.depot_code].sufficient++;
     });
-    setPsdsrByDepot(map);
+    setPsdsrByDepot(byDepot);
+    setPsdsrDsrsByDepot(dsrMap);
   }, []);
   // Latest weekly Inventory Accuracy entry per depot -- same shape/logic as PSDSR above.
   const refreshInventoryAccuracy = React.useCallback(async () => {
@@ -284,7 +309,7 @@ export function useAppData() {
   const refreshers = {
     depots: refreshDepots, stock_movements: refreshStockBalances,
     submissions: refreshSubmissions, device_ledger_baseline: refreshLedgerBaseline, device_ledger: refreshDeviceLedger,
-    psdsr_weekly: refreshPsdsr, inventory_accuracy_weekly: refreshInventoryAccuracy,
+    psdsr_daily: refreshPsdsr, inventory_accuracy_weekly: refreshInventoryAccuracy,
     cce_performance_weekly: refreshCcePerformance,
     indirect_shops: refreshIndirectShops, indirect_accuracy_weekly: refreshIndirectAccuracy,
     ...(WAREHOUSE_PENDING_ENABLED ? { warehouse_pending_stock: refreshWarehousePending } : {}),
@@ -399,19 +424,29 @@ export function useAppData() {
     await refreshWarehousePending();
     return codes.reduce((sum, c) => sum + byDepotMap[c].length, 0);
   }, [writeWarehousePending, refreshWarehousePending]);
-  // One upsert per depot for a week's PSDSR entry -- re-pasting the same period_date
-  // overwrites that depot's row for the week rather than duplicating it (unique on
-  // depot_code+period_date).
-  const savePsdsrBulk = React.useCallback(async (byDepotMap, enteredBy, periodDate) => {
+  // byDepotMap: { depotCode: [{salesAgentId, fullName, phoneNumber, acquisitionSalesL7,
+  // qosOnDay, stockYesterday, isProductive, isSufficient}, ...] }. Re-uploading for the same
+  // day replaces each touched depot's whole DSR roster for that day (delete then insert,
+  // same pattern as saveLedgerBaseline) rather than upserting row by row -- a DSR who
+  // dropped off the list since the last upload needs to actually disappear, not linger.
+  const savePsdsrDailyBulk = React.useCallback(async (byDepotMap, enteredBy, uploadDate) => {
     const codes = Object.keys(byDepotMap);
-    if (!codes.length) throw new Error("No matched rows to save yet — check the depot names.");
-    const rows = codes.map((code) => ({
-      depot_code: code, period_date: periodDate,
-      total_pdsr: byDepotMap[code].total, sufficient_stocks: byDepotMap[code].sufficient,
-      entered_by: enteredBy || null, updated_at: new Date().toISOString(),
-    }));
+    if (!codes.length) throw new Error("No matched rows to save yet — check the shop names.");
+    for (const batch of chunkArr(codes, 100)) {
+      const { error } = await supabaseClient.from("psdsr_daily").delete().eq("upload_date", uploadDate).in("depot_code", batch);
+      if (error) throw error;
+    }
+    const rows = [];
+    codes.forEach((code) => {
+      byDepotMap[code].forEach((r) => rows.push({
+        depot_code: code, upload_date: uploadDate, sales_agent_id: r.salesAgentId, full_name: r.fullName,
+        phone_number: r.phoneNumber || null, acquisition_sales_l7: r.acquisitionSalesL7, qos_on_day: r.qosOnDay,
+        stock_yesterday: r.stockYesterday, is_productive: r.isProductive, is_sufficient: r.isSufficient,
+        entered_by: enteredBy || null,
+      }));
+    });
     for (const batch of chunkArr(rows, 500)) {
-      const { error } = await supabaseClient.from("psdsr_weekly").upsert(batch, { onConflict: "depot_code,period_date" });
+      const { error } = await supabaseClient.from("psdsr_daily").insert(batch);
       if (error) throw error;
     }
     await refreshPsdsr();
@@ -692,13 +727,13 @@ export function useAppData() {
   }, []);
 
   return {
-    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot, inventoryAccuracyByDepot,
+    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot, psdsrDsrsByDepot, inventoryAccuracyByDepot,
     inventoryAccuracyHistory,
     cceByDepot, cceHistory,
     indirectShops, indirectAccuracyByShop, indirectAccuracyHistory,
     loaded, dbError, retryLoad: loadAll, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
-    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrBulk, saveInventoryAccuracyBulk, saveCcePerformanceBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
+    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrDailyBulk, saveInventoryAccuracyBulk, saveCcePerformanceBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
     captureSnapshot, fetchSnapshot, fetchSnapshotRange,
     fetchUsers, saveUserRole, removeUserRole,

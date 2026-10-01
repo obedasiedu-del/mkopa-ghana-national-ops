@@ -613,18 +613,26 @@ export function parseDepotStockPaste(text, depots) {
   return { byDepot, skipped, unmatchedRows, unmatchedCounts };
 }
 
-// PSDSR (Productive [agents with] Sufficient Stock Ratio) weekly bulk paste -- one row per
-// depot: Depot, Total PDSR (count of productive DSRs), Sufficient Stocks (of those, how many
-// carry enough stock). This is deliberately the exact 3-column shape the source system's own
-// weekly export already produces (verified against a real file), so it can be pasted in
-// as-is with no reformatting. PSDSR % itself is computed from these two counts, not pasted.
-export function parsePsdsrPaste(text, depots) {
+// PSDSR (Productive [agents with] Sufficient Stock Ratio) daily bulk upload -- one row per
+// DSR (the real "Last_7_Days" export, verified against a real file): SalesAgentId, FullName,
+// PhoneNumber, AcquisitionSalesL7, QoSOnDay, ShopName, Stock Yesterday. "Productive" and
+// "sufficient stock" aren't literal flags in the source -- they're thresholds agreed with
+// ops, applied here: productive means >=3 sales in the trailing 7 days, sufficient means
+// >=3 devices in stock as of yesterday. Re-uploading for the same day replaces that depot's
+// DSR roster for the day (not additive) -- see savePsdsrDailyBulk.
+export const PSDSR_PRODUCTIVE_MIN_SALES = 3;
+export const PSDSR_SUFFICIENT_MIN_STOCK = 3;
+// The source export also carries junk rows (stray keystrokes landing in otherwise-blank
+// rows, autofill artifacts) that have no real SalesAgentId -- a real one is always a GUID,
+// so anything else is silently dropped rather than counted as a DSR.
+const SALES_AGENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function parsePsdsrDailyPaste(text, depots) {
   const lines = splitPasteLines(text);
   const depotIndex = buildDepotIndex(depots);
   const matchCache = {};
-  function matchCached(depotText) {
-    const key = normalizeDepotName(depotText);
-    if (!(key in matchCache)) matchCache[key] = matchDepotForShop(depotText, depotIndex);
+  function matchCached(shopName) {
+    const key = normalizeDepotName(shopName);
+    if (!(key in matchCache)) matchCache[key] = matchDepotForShop(shopName, depotIndex);
     return matchCache[key];
   }
   const byDepot = {};
@@ -632,35 +640,38 @@ export function parsePsdsrPaste(text, depots) {
   const unmatchedCounts = {};
   let skipped = 0;
   lines.forEach((line, idx) => {
-    let cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
-    cells = cells.map((c) => c.trim());
-    if (idx === 0 && /^(depot|shop)/i.test(cells[0] || "") && /pdsr|total/i.test(cells[1] || "")) return;
-    const depotText = cells[0] || "";
-    let total = parseInt(cells[1] || "", 10);
-    let sufficient = parseInt(cells[2] || "", 10);
-    if (!depotText || Number.isNaN(total)) { skipped++; return; }
-    if (total < 0) total = 0;
-    if (Number.isNaN(sufficient) || sufficient < 0) sufficient = 0;
-    if (sufficient > total) sufficient = total; // a typo shouldn't be able to produce >100%
-    // PSDSR data (unlike a device paste) includes indirect-channel/partner-shop agents
-    // directly, with no separate Indirect Channel bucket to route them to -- and critically,
-    // a partner shop named after the same town as a real depot (e.g. "Franko Kasoa" vs
-    // "Kasoa Depot") fuzzy-matches that depot's single-word name and would silently
-    // overwrite its real entry if matched normally. Checked and excluded before the fuzzy
-    // match is even attempted, not after.
-    if (isIndirectChannelShop(depotText)) {
-      unmatchedCounts[depotText] = (unmatchedCounts[depotText] || 0) + 1;
-      unmatchedRows.push({ depotText, total, sufficient, reason: "Indirect/partner shop, not a depot" });
+    const cells = (line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",")).map((c) => c.trim());
+    if (idx === 0 && /salesagentid/i.test((cells[0] || "").replace(/\s+/g, ""))) return;
+    const salesAgentId = cells[0] || "";
+    const fullName = cells[1] || "";
+    const phoneNumber = cells[2] || "";
+    const acquisitionSalesL7 = parseInt(cells[3] || "", 10) || 0;
+    const qosOnDay = Number(cells[4]);
+    const shopName = cells[5] || "";
+    const stockYesterday = parseInt(cells[6] || "", 10) || 0;
+    if (!SALES_AGENT_ID_RE.test(salesAgentId) || !fullName) { skipped++; return; }
+    const row = {
+      salesAgentId, fullName, phoneNumber, acquisitionSalesL7,
+      qosOnDay: Number.isFinite(qosOnDay) ? qosOnDay : null, shopName, stockYesterday,
+      isProductive: acquisitionSalesL7 >= PSDSR_PRODUCTIVE_MIN_SALES,
+      isSufficient: stockYesterday >= PSDSR_SUFFICIENT_MIN_STOCK,
+    };
+    // Same reasoning as the device-ledger import: a partner shop named after the same town
+    // as a real depot would otherwise fuzzy-match it and silently mix into its roster.
+    if (isIndirectChannelShop(shopName)) {
+      unmatchedCounts[shopName] = (unmatchedCounts[shopName] || 0) + 1;
+      unmatchedRows.push({ ...row, reason: "Indirect/partner shop, not a depot" });
       return;
     }
-    const code = matchCached(depotText);
+    const code = matchCached(shopName);
     if (!code) {
-      const key = depotText || "(blank depot)";
+      const key = shopName || "(blank shop name)";
       unmatchedCounts[key] = (unmatchedCounts[key] || 0) + 1;
-      unmatchedRows.push({ depotText, total, sufficient, reason: "Not matched to a depot" });
+      unmatchedRows.push({ ...row, reason: "Not matched to a depot" });
       return;
     }
-    byDepot[code] = { total, sufficient }; // last row for a depot wins if it appears twice in one paste
+    if (!byDepot[code]) byDepot[code] = [];
+    byDepot[code].push(row);
   });
   return { byDepot, skipped, unmatchedRows, unmatchedCounts };
 }
