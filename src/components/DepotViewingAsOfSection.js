@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { KpiCard } from "./ui.js";
 import { fmtNum, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
 import { ledgerDevices, latestSubmissionForDepot } from "../lib/selectors.js";
-import { countsForDevices, trueAgePct, submissionTotals, psdsrPct } from "../lib/domain.js";
+import { countsForDevices, trueAgePct, submissionTotals, psdsrPct, fifoComplianceStats } from "../lib/domain.js";
 
 const SNAPSHOT_RANGE_DAYS = 14;
 const SNAPSHOT_DELTA_DAYS = 3;
@@ -14,8 +14,10 @@ const SNAPSHOT_TARGET_KEYS = ["trueAgePct", "psdsrPct", "inventoryAccuracyPct"];
 // depot instead. kpi_snapshots.scope is a plain text column -- using the depot's own code
 // as the scope value needs no schema change, it's just one more value alongside "national"
 // and the 9 region names. Keeps its own smaller metric set (no SC Coverage/Active
-// Depots/Allocation Halts/FIFO -- those are scope-wide concepts that don't mean anything for
-// a single depot, and the halt banner above already covers this depot's own halt status).
+// Depots/Allocation Halts -- those genuinely only mean something across multiple depots, and
+// the halt banner above already covers this depot's own halt status). FIFO Compliance *does*
+// apply to a single depot (it's this depot's own aged-device cohort, not an aggregate), so it
+// gets the same card + daily companion line National/Region show.
 export function DepotViewingAsOfSection({ rec }) {
   const { data, openModal } = useApp();
   const ledgerDvs = ledgerDevices(data.deviceLedger, rec.code);
@@ -25,6 +27,12 @@ export function DepotViewingAsOfSection({ rec }) {
   const invAcc = data.inventoryAccuracyByDepot[rec.code] || null;
   const psdsrRow = data.psdsrByDepot[rec.code] || null;
 
+  const fifo = React.useMemo(() => fifoComplianceStats(ledgerDvs), [ledgerDvs]);
+  // Same windowDays=1 companion as National/Region -- devices already aged as of yesterday,
+  // how many have sold since. Kept out of liveMetrics (and so out of the snapshot/badge/
+  // sparkline system) since it's meant to be a fresh daily read, not a tracked trend.
+  const fifoDaily = React.useMemo(() => fifoComplianceStats(ledgerDvs, 1), [ledgerDvs]);
+
   const liveMetrics = React.useMemo(() => ({
     deviceTotal: subTotals ? subTotals.totalStock : 0,
     dsrTotal: counts.total,
@@ -32,7 +40,8 @@ export function DepotViewingAsOfSection({ rec }) {
     trueAgePct: trueAgePct(counts),
     psdsrPct: psdsrPct(psdsrRow),
     inventoryAccuracyPct: invAcc ? invAcc.pct : null,
-  }), [subTotals, counts, psdsrRow, invAcc]);
+    fifoPct: fifo.pct, fifoCohort: fifo.cohort, fifoSold: fifo.sold,
+  }), [subTotals, counts, psdsrRow, invAcc, fifo]);
 
   const scope = rec.code;
   const [viewDate, setViewDate] = React.useState(todayStr());
@@ -100,8 +109,13 @@ export function DepotViewingAsOfSection({ rec }) {
     React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
       React.createElement(KpiCard, { label: "Devices at Depot", value: dm ? fmtNum(dm.deviceTotal) : "—", foot: "from daily submission", ...cardExtras("deviceTotal") }),
       React.createElement(KpiCard, { label: "Devices with DSRs", value: dm ? fmtNum(dm.dsrTotal) : "—", foot: "serial-level", ...cardExtras("dsrTotal") }),
-      React.createElement(KpiCard, { label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—", foot: "halt-policy threshold", ...cardExtras("aged14Total") }),
+      React.createElement(KpiCard, {
+        label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—",
+        foot: isToday ? fmtNum(fifoDaily.sold) + " sold today (of " + fmtNum(fifoDaily.cohort) + " aged since yesterday)" : "halt-policy threshold",
+        ...cardExtras("aged14Total"),
+      }),
       React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry · tap for names" : "no entry yet", onClick: () => openModal("psdsrDetail", { depotCode: rec.code }), ...cardExtras("psdsrPct") }),
-      React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: invAcc ? "latest entry" : "no entry yet", ...cardExtras("inventoryAccuracyPct") })));
+      React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: invAcc ? "latest entry" : "no entry yet", ...cardExtras("inventoryAccuracyPct") }),
+      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold this week" : "", ...cardExtras("fifoPct") })));
 }
