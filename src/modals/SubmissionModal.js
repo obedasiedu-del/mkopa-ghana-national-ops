@@ -3,7 +3,7 @@ import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { Modal } from "../components/ui.js";
 import { depotsForScope } from "../lib/selectors.js";
-import { SUBMISSION_MODELS, todayStr, fmtDateShort, submissionTotals, agedPctColor, downloadCsv } from "../lib/domain.js";
+import { SUBMISSION_MODELS, todayStr, fmtDateShort, fmtDateTime, submissionTotals, agedPctColor, downloadCsv } from "../lib/domain.js";
 
 // A tab you switch away from (or a laptop that sleeps and drops the connection long enough
 // to force a session refresh) can lose whatever's only sitting in this modal's React state --
@@ -94,11 +94,11 @@ export function SubmissionModal({ depotCode: initialCode }) {
   }
   function exportHistory() {
     const days = (data.submissionsByDepot[depotCode] || []).slice().reverse();
-    const rows = [["Date", "Submitted By"].concat(SUBMISSION_MODELS.flatMap((m) => [m + " Total", m + " Aged"])).concat(["Total", "Aged", "% Aged"])];
+    const rows = [["Date", "Submitted At", "Submitted By"].concat(SUBMISSION_MODELS.flatMap((m) => [m + " Total", m + " Aged"])).concat(["Total", "Aged", "% Aged"])];
     days.forEach((h) => {
       const t = submissionTotals(h);
       const pct = t.totalStock > 0 ? Math.round((t.agedStock / t.totalStock) * 1000) / 10 : 0;
-      const row = [h.date, h.submittedBy];
+      const row = [h.date, fmtDateTime(h.updatedAt), h.submittedBy];
       SUBMISSION_MODELS.forEach((m) => { const r = h.models && h.models[m]; row.push(r ? r.totalStock : 0, r ? r.agedStock : 0); });
       row.push(t.totalStock, t.agedStock, pct);
       rows.push(row);
@@ -146,7 +146,9 @@ export function SubmissionModal({ depotCode: initialCode }) {
             const tt = submissionTotals(h);
             const pct = tt.totalStock > 0 ? Math.round((tt.agedStock / tt.totalStock) * 1000) / 10 : 0;
             return React.createElement("tr", { key: h.date },
-              React.createElement("td", null, fmtDateShort(h.date)),
+              React.createElement("td", null,
+                fmtDateShort(h.date),
+                React.createElement("div", { className: "mono", style: { fontSize: 10.5, color: "var(--text-faint)" } }, fmtDateTime(h.updatedAt))),
               React.createElement("td", null, h.submittedBy),
               SUBMISSION_MODELS.map((m) => {
                 const row = h.models && h.models[m];

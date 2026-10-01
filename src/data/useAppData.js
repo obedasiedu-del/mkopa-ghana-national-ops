@@ -105,7 +105,7 @@ export function useAppData() {
     const map = {};
     rows.forEach((r) => {
       if (!map[r.depot_code]) map[r.depot_code] = [];
-      map[r.depot_code].push({ date: r.date, submittedBy: r.submitted_by || "", models: r.models || {} });
+      map[r.depot_code].push({ date: r.date, submittedBy: r.submitted_by || "", models: r.models || {}, updatedAt: r.updated_at });
     });
     Object.keys(map).forEach((code) => map[code].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)));
     setSubmissionsByDepot(map);
@@ -321,12 +321,13 @@ export function useAppData() {
   }, []);
 
   const saveSubmission = React.useCallback(async (depotCode, dateStr, submittedBy, modelsObj) => {
+    const updatedAt = new Date().toISOString();
     const { error } = await supabaseClient.from("submissions").upsert(
-      { depot_code: depotCode, date: dateStr, submitted_by: submittedBy, models: modelsObj, updated_at: new Date().toISOString() },
+      { depot_code: depotCode, date: dateStr, submitted_by: submittedBy, models: modelsObj, updated_at: updatedAt },
       { onConflict: "depot_code,date" }
     );
     if (error) throw error;
-    const entry = { date: dateStr, submittedBy: submittedBy || "", models: modelsObj };
+    const entry = { date: dateStr, submittedBy: submittedBy || "", models: modelsObj, updatedAt };
     setSubmissionsByDepot((prev) => {
       const list = prev[depotCode] || [];
       const idx = list.findIndex((s) => s.date === dateStr);

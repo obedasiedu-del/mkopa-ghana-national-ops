@@ -155,7 +155,7 @@ function DevicesTab({ rec, canWrite, isScUser }) {
         canWrite && React.createElement("button", { className: "btn btn-primary btn-sm", onClick: saveSc }, "Save Stock Controller")),
       !isScUser && React.createElement(CceCard, { rec, canWrite }),
       React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-        React.createElement(KpiTile, { label: "Devices at Depot", value: subTotals ? fmtNum(subTotals.totalStock) : "—", foot: latestSubmission ? "from daily submission · " + fmtDateShort(latestSubmission.date) : "no daily submission yet" }),
+        React.createElement(KpiTile, { label: "Devices at Depot", value: subTotals ? fmtNum(subTotals.totalStock) : "—", foot: latestSubmission ? "from daily submission · " + fmtDateTime(latestSubmission.updatedAt) : "no daily submission yet" }),
         React.createElement(KpiTile, { label: "Aged (11d+, reported)", value: subTotals ? fmtNum(subTotals.agedStock) : "—", foot: "self-reported in submission" }),
         React.createElement(KpiTile, { label: "Received (movements)", value: fmtNum(depotTotals.received), foot: "all-time transfer history" }),
         React.createElement(KpiTile, { label: "Issued (movements)", value: fmtNum(depotTotals.issued), foot: "all-time transfer history" })),
@@ -220,11 +220,11 @@ function SubmissionTab({ rec, canWrite }) {
   const pct = latestTotals && latestTotals.totalStock > 0 ? Math.round((latestTotals.agedStock / latestTotals.totalStock) * 1000) / 10 : null;
 
   function exportCsv() {
-    const rows = [["Date", "Submitted By"].concat(SUBMISSION_MODELS.flatMap((m) => [m + " Total", m + " Aged"])).concat(["Total", "Aged", "% Aged"])];
+    const rows = [["Date", "Submitted At", "Submitted By"].concat(SUBMISSION_MODELS.flatMap((m) => [m + " Total", m + " Aged"])).concat(["Total", "Aged", "% Aged"])];
     days.slice().reverse().forEach((h) => {
       const t = submissionTotals(h);
       const p = t.totalStock > 0 ? Math.round((t.agedStock / t.totalStock) * 1000) / 10 : 0;
-      const row = [h.date, h.submittedBy];
+      const row = [h.date, fmtDateTime(h.updatedAt), h.submittedBy];
       SUBMISSION_MODELS.forEach((m) => { const r = h.models && h.models[m]; row.push(r ? r.totalStock : 0, r ? r.agedStock : 0); });
       row.push(t.totalStock, t.agedStock, p);
       rows.push(row);
@@ -246,13 +246,14 @@ function SubmissionTab({ rec, canWrite }) {
       : React.createElement("div", { className: "table-wrap" },
         React.createElement("table", null,
           React.createElement("thead", null, React.createElement("tr", null,
-            React.createElement("th", null, "Date"), React.createElement("th", null, "Submitted by"),
+            React.createElement("th", null, "Date"), React.createElement("th", null, "Submitted at"), React.createElement("th", null, "Submitted by"),
             React.createElement("th", { className: "num" }, "Total"), React.createElement("th", { className: "num" }, "Aged"), React.createElement("th", { className: "num" }, "% Aged"))),
           React.createElement("tbody", null, days.slice(0, 20).map((h) => {
             const t = submissionTotals(h);
             const p = t.totalStock > 0 ? Math.round((t.agedStock / t.totalStock) * 1000) / 10 : 0;
             return React.createElement("tr", { key: h.date },
               React.createElement("td", null, React.createElement(Pill, { cls: h.date === today ? "pill-success" : "pill-muted" }, fmtDateShort(h.date))),
+              React.createElement("td", { className: "mono", style: { fontSize: 12 } }, fmtDateTime(h.updatedAt)),
               React.createElement("td", null, h.submittedBy),
               React.createElement("td", { className: "num mono", style: { fontWeight: 600 } }, t.totalStock),
               React.createElement("td", { className: "num mono" }, t.agedStock),
