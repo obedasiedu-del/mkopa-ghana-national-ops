@@ -4,6 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { REGION_ORDER, OTHER_SCOPES, USER_ROLES } from "../lib/domain.js";
 import { depotsForScope, activeDepots } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
+import mkopaMark from "../assets/mkopa-mark.png";
 
 function Sidebar() {
   const { data, auth, route, goNational, goRegion, goAdmin, goDepot } = useApp();
@@ -15,7 +16,7 @@ function Sidebar() {
   return React.createElement("aside", { className: "sidebar" },
     React.createElement("div", { className: "brand" },
       React.createElement("div", { className: "brand-mark" },
-        React.createElement("div", { className: "brand-icon" }, "GH"),
+        React.createElement("img", { className: "brand-icon", src: mkopaMark, alt: "M-KOPA" }),
         React.createElement("div", null,
           React.createElement("div", { className: "brand-title" }, "National Retail OPS"),
           React.createElement("div", { className: "brand-sub" }, "M-KOPA Ghana"))),

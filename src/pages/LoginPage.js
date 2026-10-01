@@ -1,6 +1,7 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
+import mkopaMark from "../assets/mkopa-mark.png";
 
 export function LoginPage() {
   const { auth } = useApp();
@@ -21,7 +22,7 @@ export function LoginPage() {
   return React.createElement("div", { className: "auth-shell" },
     React.createElement("div", { className: "auth-card" },
       React.createElement("div", { className: "brand-mark" },
-        React.createElement("div", { className: "brand-icon" }, "GH"),
+        React.createElement("img", { className: "brand-icon", src: mkopaMark, alt: "M-KOPA" }),
         React.createElement("div", null,
           React.createElement("div", { className: "brand-title" }, "National Retail OPS"),
           React.createElement("div", { className: "brand-sub" }, "M-KOPA Ghana"))),
