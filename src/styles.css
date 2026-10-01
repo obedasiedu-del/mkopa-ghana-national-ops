@@ -1,4 +1,9 @@
 :root{
+  /* Tells the browser itself (not just our own CSS) which palette is active, so native
+     widgets it renders outside our control -- the <input type="date"> calendar popup,
+     <select> dropdown lists, scrollbars -- pick a matching light/dark style instead of
+     defaulting to a light (black-on-white) widget that sits awkwardly inside a dark page. */
+  color-scheme: light;
   --bg:#f6f5f2;
   --surface:#ffffff;
   --surface-2:#efeee8;
@@ -28,6 +33,7 @@
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
+    color-scheme: dark;
     --bg:#14171a; --surface:#1b1f22; --surface-2:#20252a; --surface-3:#282e34; --border:#333a41;
     --text:#e9e7e0; --text-muted:#9c9a91; --text-faint:#6f6d65;
     --accent:#5cb3a3; --accent-strong:#89cdc0; --accent-soft:#1c3230; --accent-contrast:#0f1c1a;
@@ -38,7 +44,11 @@
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -12px rgba(0,0,0,0.5);
   }
 }
+:root[data-theme="light"]{
+  color-scheme: light;
+}
 :root[data-theme="dark"]{
+  color-scheme: dark;
   --bg:#14171a; --surface:#1b1f22; --surface-2:#20252a; --surface-3:#282e34; --border:#333a41;
   --text:#e9e7e0; --text-muted:#9c9a91; --text-faint:#6f6d65;
   --accent:#5cb3a3; --accent-strong:#89cdc0; --accent-soft:#1c3230; --accent-contrast:#0f1c1a;
