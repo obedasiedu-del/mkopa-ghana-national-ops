@@ -34,9 +34,10 @@ export function DepotViewingAsOfSection({ rec }) {
   const clockInEntry = data.clockInsByDepot[rec.code] || null;
   const clockInLate = clockInEntry ? clockInIsLate(clockInEntry.clockedInAt) : null;
 
-  // Daily reading, same as National/Region -- devices already aged as of yesterday, how many
-  // have sold since.
-  const fifo = React.useMemo(() => fifoComplianceStats(ledgerDvs, 1), [ledgerDvs]);
+  // 7-day rolling clearance rate, same as National/Region -- devices already aged at the
+  // start of the window, how many have sold since. See selectors.js's overviewStats for why
+  // this isn't a 1-day window.
+  const fifo = React.useMemo(() => fifoComplianceStats(ledgerDvs, 7), [ledgerDvs]);
 
   const liveMetrics = React.useMemo(() => ({
     deviceTotal: subTotals ? subTotals.totalStock : 0,
@@ -128,6 +129,6 @@ export function DepotViewingAsOfSection({ rec }) {
       }),
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry · tap for names" : "no entry yet", onClick: () => openModal("psdsrDetail", { depotCode: rec.code }), ...cardExtras("psdsrPct") }),
       React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: invAcc ? "latest entry" : "no entry yet", ...cardExtras("inventoryAccuracyPct") }),
-      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", ...cardExtras("fifoPct") }),
+      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold in the last 7 days" : "", ...cardExtras("fifoPct") }),
       React.createElement(ReallocationTile, { scope: rec.code, singleDepotCode: rec.code })));
 }

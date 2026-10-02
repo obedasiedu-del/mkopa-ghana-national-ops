@@ -83,15 +83,17 @@ export function overviewStats(data, scope) {
   let ledgerCounts = { total: 0, inTrade: 0, fresh: 0, aged: 0, urgent: 0, reallocated: 0, returned: 0, sold: 0 };
   let aged10Plus = 0;
   let fifoCohort = 0, fifoSold = 0;
-  // Daily reading, per Marvin's ask: devices that were already aged as of yesterday, and how
-  // many of those have sold since -- a fresh number every morning ("today's FIFO clearing"),
-  // not smoothed into a week.
+  // 7-day rolling clearance rate: devices that were already aged (14d+) at the start of the
+  // window, and what share of those have sold since. A 1-day window (the original version of
+  // this, per Marvin's ask) was too noisy to read -- most depots only sell a device or two a
+  // day total, so the odds any of today's sales happened to come from yesterday's aged cohort
+  // specifically were low, and the card read 0% most days even at a depot clearing stock fine.
   ledgerDepots.forEach((d) => {
     const devices = ledgerDevices(data.deviceLedger, d.code);
     const c = countsForDevices(devices);
     Object.keys(ledgerCounts).forEach((k) => { ledgerCounts[k] += c[k]; });
     aged10Plus += countsAtDayThreshold(devices, 10);
-    const fifo = fifoComplianceStats(devices, 1);
+    const fifo = fifoComplianceStats(devices, 7);
     fifoCohort += fifo.cohort;
     fifoSold += fifo.sold;
   });
