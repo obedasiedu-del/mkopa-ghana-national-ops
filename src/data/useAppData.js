@@ -17,17 +17,36 @@ function buildPageQuery(table, orderCol, from, filterFn) {
   if (orderCol) q = q.order(orderCol, { ascending: true });
   return q;
 }
+// On a real mobile connection, a single request dropping mid-flight (no response at all) is
+// often a one-off blip, not a lasting outage -- the same request a couple seconds later
+// frequently just works. A genuine rejection from the server (permission denied, a bad
+// column, a constraint) always carries a `.code`; retrying that gets the identical rejection
+// every time, so only the no-response case is worth it. Dozens of these fire in parallel on
+// every load (one per page, across every table) -- without this, any single dropped one took
+// the whole dashboard load down instead of just that one request quietly succeeding on retry.
+const FETCH_RETRY_DELAYS_MS = [500, 1500, 3500];
+async function queryWithRetry(buildQuery) {
+  let result;
+  for (let attempt = 0; ; attempt++) {
+    result = await buildQuery();
+    if (!result.error || result.error.code) return result;
+    if (attempt >= FETCH_RETRY_DELAYS_MS.length) return result;
+    await new Promise((resolve) => setTimeout(resolve, FETCH_RETRY_DELAYS_MS[attempt]));
+  }
+}
 async function fetchAll(table, orderCol, filterFn) {
-  let countQ = supabaseClient.from(table).select("*", { count: "exact", head: true });
-  if (filterFn) countQ = filterFn(countQ);
-  const { count, error: countErr } = await countQ;
+  const { count, error: countErr } = await queryWithRetry(() => {
+    let countQ = supabaseClient.from(table).select("*", { count: "exact", head: true });
+    if (filterFn) countQ = filterFn(countQ);
+    return countQ;
+  });
   if (countErr) throw countErr;
   const total = count || 0;
   if (total === 0) return [];
   const pageCount = Math.ceil(total / PAGE_SIZE);
   const pageRows = new Array(pageCount);
   await runWithConcurrency(Array.from({ length: pageCount }, (_, p) => p), FETCH_CONCURRENCY, async (p) => {
-    const { data, error } = await buildPageQuery(table, orderCol, p * PAGE_SIZE, filterFn);
+    const { data, error } = await queryWithRetry(() => buildPageQuery(table, orderCol, p * PAGE_SIZE, filterFn));
     if (error) throw error;
     pageRows[p] = data || [];
   });
@@ -290,9 +309,16 @@ export function useAppData(authKey) {
   // Tags a refresh failure with which table it came from -- Supabase/fetch errors don't
   // self-identify the source, and without this every failure collapses into the same
   // generic message, leaving no way to tell a network drop from an RLS/permission issue
-  // from the resulting banner alone.
+  // from the resulting banner alone. Carries the original `.code` (if any) onto the new
+  // Error too -- that's the one field the banner actually checks to tell "the server
+  // rejected this" from "this never reached the server at all", and a plain `new Error()`
+  // otherwise drops it on the floor.
   function tagSource(name, fn) {
-    return fn().catch((e) => { throw new Error(`[${name}] ${describeError(e)}`); });
+    return fn().catch((e) => {
+      const wrapped = new Error(`[${name}] ${describeError(e)}`);
+      if (e && e.code) wrapped.code = e.code;
+      throw wrapped;
+    });
   }
   const loadAllTagged = React.useCallback(() => {
     const tasks = [
