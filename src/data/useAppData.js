@@ -57,7 +57,17 @@ async function runWithConcurrency(items, limit, fn) {
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
-export function useAppData() {
+// authKey identifies who's signed in right now: undefined while auth is still resolving,
+// null when signed out, the user's id once signed in. AppProvider sits above the login check
+// (Shell, inside it, is what actually shows LoginPage) -- so this hook mounts exactly once
+// for the whole page load, not once per login. Without authKey, its initial fetch fires
+// immediately on that one mount, often before the session has even finished resolving, loads
+// under no session (RLS returns nothing) or a just-logged-out one, and then never runs again
+// -- logging in afterwards left the dashboard empty until a full browser refresh re-mounted
+// everything from scratch with the session already in place. Keying the fetch to authKey
+// instead makes it (re)run on every real sign-in -- after a fresh login, after signing out and
+// into a different account on the same tab -- without needing a reload to see it.
+export function useAppData(authKey) {
   const [depots, setDepots] = React.useState({});
   const [stockBalances, setStockBalances] = React.useState({});
   const [submissionsByDepot, setSubmissionsByDepot] = React.useState({});
@@ -307,7 +317,11 @@ export function useAppData() {
   }, [loadAllTagged]);
 
   React.useEffect(() => {
+    if (authKey === undefined) return; // auth still resolving -- nothing to fetch yet
+    if (authKey === null) { setLoaded(false); setDbError(null); return; } // signed out -- LoginPage is showing, nothing to load
     let cancelled = false;
+    setLoaded(false);
+    setDbError(null);
     (async () => {
       try {
         await loadAllTagged();
@@ -317,7 +331,7 @@ export function useAppData() {
       }
     })();
     return () => { cancelled = true; };
-  }, [loadAllTagged]);
+  }, [authKey, loadAllTagged]);
 
   // Debounced realtime refresh -- a bulk paste can insert thousands of device_ledger rows in one
   // go, and Postgres realtime fires one event PER row; without coalescing, that would trigger

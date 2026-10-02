@@ -7,8 +7,12 @@ import { useRouter } from "../router.js";
 const AppContext = React.createContext(null);
 
 export function AppProvider({ children }) {
-  const data = useAppData();
   const auth = useAuth();
+  // undefined while the session is still resolving, null once confirmed signed out, the
+  // user's id once signed in -- see useAppData's own comment for why this has to drive its
+  // fetch instead of firing once on this provider's single, page-lifetime mount.
+  const authKey = auth.loading ? undefined : (auth.user ? auth.user.id : null);
+  const data = useAppData(authKey);
   const router = useRouter();
 
   const [search, setSearch] = React.useState("");
