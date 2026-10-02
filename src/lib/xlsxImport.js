@@ -230,6 +230,46 @@ export function readCceProductivitySheet(wb, sheetName) {
   return { textRows, totalRows, shopCount: textRows.length };
 }
 
+// Same idea for the "AGED SOLD" sheet of the Device Aging Control Report -- prefer a sheet
+// named for it, else sniff for its distinctive SerialNumber column. Only SerialNumber is
+// ever read: the sheet's SaleDate column is a stale constant (every row the same date,
+// unrelated to DeviceHolderStartDate -- not a real per-device sale date), so the app treats
+// "this serial is in today's upload" as the sale signal and stamps it with the upload's own
+// time instead (see saveAgedSoldBulk / classifyAgedSoldSerials).
+export function guessAgedSoldSheet(wb) {
+  const byName = wb.SheetNames.find((n) => /aged.?sold/i.test(n));
+  if (byName) return byName;
+  const byHeader = wb.SheetNames.find((n) => sheetLooksLikeAgedSold(wb, n));
+  return byHeader || wb.SheetNames[0];
+}
+function findAgedSoldHeaderRow(wb, sheetName) {
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, raw: true, defval: "", blankrows: false });
+  const idx = aoa.findIndex((row) => row.some((c) => normalizeHeader(c).replace(/\s+/g, "") === "serialnumber"));
+  return { aoa, idx };
+}
+export function sheetLooksLikeAgedSold(wb, sheetName) {
+  return findAgedSoldHeaderRow(wb, sheetName).idx !== -1;
+}
+export function readAgedSoldSheet(wb, sheetName) {
+  const { aoa, idx: headerIdx } = findAgedSoldHeaderRow(wb, sheetName);
+  if (headerIdx === -1) throw new Error('Could not find a "SerialNumber" column on sheet "' + sheetName + '".');
+  const header = aoa[headerIdx].map(normalizeHeader).map((h) => h.replace(/\s+/g, ""));
+  const serialIdx = header.findIndex((h) => h === "serialnumber");
+  const agedStatusIdx = header.findIndex((h) => h === "agedstatus");
+  const serials = [];
+  let agedCount = 0;
+  for (let i = headerIdx + 1; i < aoa.length; i++) {
+    const row = aoa[i];
+    const raw = row[serialIdx];
+    if (raw === "" || raw === null || raw === undefined) continue;
+    const serial = String(raw).trim();
+    if (!serial) continue;
+    serials.push(serial);
+    if (agedStatusIdx !== -1 && /^aged$/i.test(String(row[agedStatusIdx]).trim())) agedCount++;
+  }
+  return { serials, totalRows: serials.length, agedCount };
+}
+
 function excelSerialToDate(serial) {
   return new Date(Math.round((serial - 25569) * 86400000));
 }

@@ -107,6 +107,7 @@ export function NationalOverviewPage() {
             STOCK_MOVEMENT_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkDepotStock") }, "Upload Stock (All Depots)"),
             React.createElement("button", { className: "btn btn-primary btn-sm", onClick: () => openModal("bulkLedger") }, "Upload Baseline (All Depots)"),
             React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkPsdsr") }, "Upload PSDSR (All Depots)"),
+            React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkAgedSold") }, "Upload Aged Sold (All Depots)"),
             React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkInventoryAccuracy") }, "Upload Inventory Accuracy (All Depots)"),
             WAREHOUSE_PENDING_ENABLED && React.createElement("button", { className: "btn btn-sm", onClick: () => openModal("bulkWarehouseStock") }, "Upload Warehouse Stock"),
             React.createElement("button", { className: "btn btn-danger btn-sm", onClick: () => openModal("clearLedger") }, "Clear All Devices"))),

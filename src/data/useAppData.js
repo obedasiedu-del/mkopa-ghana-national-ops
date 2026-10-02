@@ -381,16 +381,40 @@ export function useAppData() {
     });
   }, []);
 
+  // Used to be a blind DELETE-then-INSERT per depot on every daily upload -- simple, but it
+  // meant a device that actually sold (and so dropped off the depot's next daily export) was
+  // erased outright rather than ever landing on status='sold'. Nothing leaves a real stock
+  // room except by selling, being returned, or being reallocated elsewhere, and
+  // returns/reallocations already go through their own explicit "Mark Returned"/"Mark
+  // Reallocated" buttons (LedgerModal) -- so a serial that silently disappears from today's
+  // upload, having still been in_stock in yesterday's, is read as sold (the real driver
+  // behind why FIFO Compliance read 0% everywhere: devices weren't un-sellable, they were
+  // being deleted before anything had a chance to mark them). A serial that's already
+  // resolved (sold/returned/reallocated) and still missing is left untouched -- it's already
+  // accounted for, not newly resolved by this upload. Serials still present are upserted by
+  // the (depot_code, serial) unique constraint, same fields as the old insert.
   const writeLedgerBaseline = React.useCallback(async (depotCode, setBy, devicesArr) => {
-    const { error: delErr } = await supabaseClient.from("device_ledger").delete().eq("depot_code", depotCode);
-    if (delErr) throw delErr;
+    const { data: existing, error: fetchErr } = await supabaseClient
+      .from("device_ledger").select("serial, status").eq("depot_code", depotCode);
+    if (fetchErr) throw fetchErr;
+    const newSerials = new Set(devicesArr.map((d) => d.serial));
+    const statusUpdatedAt = new Date().toISOString();
+    const disappeared = (existing || [])
+      .filter((r) => r.status === "in_stock" && !newSerials.has(r.serial))
+      .map((r) => r.serial);
+    for (const batch of chunkArr(disappeared, 500)) {
+      const { error } = await supabaseClient.from("device_ledger").update({
+        status: "sold", status_updated_at: statusUpdatedAt, status_updated_by: setBy,
+      }).eq("depot_code", depotCode).in("serial", batch);
+      if (error) throw error;
+    }
     if (devicesArr.length) {
       const rows = devicesArr.map((d) => ({
         depot_code: depotCode, serial: d.serial, model: d.model, shop_name: d.shopName,
         dsr_name: d.dsrName, allocated_date: d.allocatedDate, initial_allocated_date: d.initialAllocatedDate || d.allocatedDate, status: d.status || "in_stock",
       }));
       for (const batch of chunkArr(rows, 500)) {
-        const { error } = await supabaseClient.from("device_ledger").insert(batch);
+        const { error } = await supabaseClient.from("device_ledger").upsert(batch, { onConflict: "depot_code,serial" });
         if (error) throw error;
       }
     }
@@ -541,6 +565,25 @@ export function useAppData() {
       return { ...prev, [depotCode]: nextList };
     });
   }, []);
+  // "Aged Sold" daily upload: bulk-flips matched serials to status='sold', stamped with the
+  // upload's own moment (not the source sheet's SaleDate column, which is a stale constant
+  // -- see classifyAgedSoldSerials). `matched` is [{serial, depotCode}], already classified
+  // by the caller (not-found and already-sold serials never reach here). Matches purely by
+  // serial, so a chunk can span many depots in one statement; RLS (fn_can_write_depot) still
+  // filters each row server-side the same as any other write, same as every other bulk save.
+  const saveAgedSoldBulk = React.useCallback(async (matched, enteredBy) => {
+    const statusUpdatedAt = new Date().toISOString();
+    const statusUpdatedBy = enteredBy || "";
+    const serials = matched.map((m) => m.serial);
+    for (const batch of chunkArr(serials, 500)) {
+      const { error } = await supabaseClient.from("device_ledger").update({
+        status: "sold", status_updated_at: statusUpdatedAt, status_updated_by: statusUpdatedBy,
+      }).in("serial", batch).neq("status", "sold");
+      if (error) throw error;
+    }
+    await refreshDeviceLedger();
+    return serials.length;
+  }, [refreshDeviceLedger]);
   // One row per depot per day (unique(depot_code, clock_date)) -- upsert so a Stock
   // Controller re-tapping "Clock In" (e.g. the first tap's geolocation timed out) replaces
   // rather than errors on the existing row. `location` is {lat, lng, accuracyM} captured by
@@ -775,7 +818,7 @@ export function useAppData() {
     indirectShops, indirectAccuracyByShop, indirectAccuracyHistory,
     loaded, dbError, retryLoad: loadAll, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
-    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrDailyBulk, saveClockIn, saveInventoryAccuracyBulk, saveCcePerformanceBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
+    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrDailyBulk, saveClockIn, saveAgedSoldBulk, saveInventoryAccuracyBulk, saveCcePerformanceBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
     captureSnapshot, fetchSnapshot, fetchSnapshotRange,
     fetchUsers, saveUserRole, removeUserRole,

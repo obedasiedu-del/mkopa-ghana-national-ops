@@ -600,6 +600,48 @@ export function parsePastedWarehouseStock(text, depots) {
   });
   return { byDepot, skipped, indirectCounts, unrecognisedCounts, indirectRows, unrecognisedRows };
 }
+// "Aged Sold" daily upload (Device Aging Control Report's own "AGED SOLD" sheet) -- a
+// serial-number list straight from a real external sales system, not a depot/shop paste, so
+// there's no depot-matching step here at all: parseAgedSoldPaste just extracts a flat list
+// of serials (paste fallback; the primary path is readAgedSoldSheet in xlsxImport.js, which
+// produces the same shape from the actual .xlsx), and classifyAgedSoldSerials below is what
+// matches those serials against the live device ledger.
+export function parseAgedSoldPaste(text) {
+  const lines = splitPasteLines(text);
+  const serials = [];
+  lines.forEach((line, idx) => {
+    const cells = line.indexOf("\t") !== -1 ? line.split("\t") : line.split(",");
+    const first = (cells[0] || "").trim();
+    if (!first) return;
+    if (idx === 0 && /serial/i.test(first)) return; // header row
+    serials.push(first);
+  });
+  return serials;
+}
+// deviceLedgerByDepot: the same { [depotCode]: [{serial, status, ...}] } shape useAppData
+// holds as data.deviceLedger. A serial already marked sold is a no-op (alreadySold); a
+// serial this app has no record of at all is notFound (a dealer/other-channel device outside
+// what the depot ledger tracks) -- everything else gets matched regardless of its current
+// status (in_stock, returned, reallocated), since a real sales-system record of the sale is
+// authoritative over whatever this app's own ledger currently believes.
+export function classifyAgedSoldSerials(serials, deviceLedgerByDepot) {
+  const bySerial = {};
+  Object.keys(deviceLedgerByDepot || {}).forEach((depotCode) => {
+    (deviceLedgerByDepot[depotCode] || []).forEach((dv) => { bySerial[dv.serial] = { depotCode, status: dv.status }; });
+  });
+  const matched = [], alreadySold = [], notFound = [];
+  const seen = new Set();
+  (serials || []).forEach((raw) => {
+    const serial = String(raw || "").trim();
+    if (!serial || seen.has(serial)) return;
+    seen.add(serial);
+    const dv = bySerial[serial];
+    if (!dv) { notFound.push(serial); return; }
+    if (dv.status === "sold") { alreadySold.push(serial); return; }
+    matched.push({ serial, depotCode: dv.depotCode });
+  });
+  return { matched, alreadySold, notFound };
+}
 export function parseDepotStockPaste(text, depots) {
   const lines = splitPasteLines(text);
   const depotIndex = buildDepotIndex(depots);
