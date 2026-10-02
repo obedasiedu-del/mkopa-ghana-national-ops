@@ -1,25 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 36" fill="none">
-  <!-- Wordmark: text color inherits from the surrounding UI (light/dark) via currentColor;
-       the brand green "O" and the Ghana flag stay fixed regardless of theme, same as any
-       logo's own colors don't shift with the page around it. Generous gaps between each
-       piece (text / circle / text / flag) so it reads as a clean lockup, not a cramped run
-       of touching shapes. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 230 36" fill="none">
+  <!-- "M-K[O]PA" reads as one continuous word: the green circle sits where the letter O
+       would, same close kerning as the rest of the word, not set apart with its own space.
+       Only the flag, as a separate mark entirely, gets a real gap before it. Text color
+       inherits from the surrounding UI (light/dark) via currentColor; the brand green "O"
+       and the Ghana flag stay fixed regardless of theme, same as any logo's own colors don't
+       shift with the page around it. -->
   <text x="0" y="27" font-family="'IBM Plex Sans', system-ui, sans-serif" font-weight="700" font-size="26" letter-spacing="-0.02em" fill="currentColor">M-K</text>
-  <circle cx="116" cy="18" r="12" fill="#2f6f65"/>
-  <rect x="110.5" y="17" width="2.6" height="6" rx="1" fill="#ffffff"/>
-  <rect x="114.7" y="13.5" width="2.6" height="9.5" rx="1" fill="#ffffff"/>
-  <rect x="118.9" y="10" width="2.6" height="13" rx="1" fill="#ffffff"/>
-  <text x="140" y="27" font-family="'IBM Plex Sans', system-ui, sans-serif" font-weight="700" font-size="26" letter-spacing="-0.02em" fill="currentColor">PA</text>
+  <circle cx="107" cy="18" r="12" fill="#2f6f65"/>
+  <rect x="101.5" y="17" width="2.6" height="6" rx="1" fill="#ffffff"/>
+  <rect x="105.7" y="13.5" width="2.6" height="9.5" rx="1" fill="#ffffff"/>
+  <rect x="109.9" y="10" width="2.6" height="13" rx="1" fill="#ffffff"/>
+  <text x="121" y="27" font-family="'IBM Plex Sans', system-ui, sans-serif" font-weight="700" font-size="26" letter-spacing="-0.02em" fill="currentColor">PA</text>
   <!-- The Ghana flag itself: red/gold/green horizontal bands with the black star, clipped to
-       a small rounded rect so it reads as a flag swatch next to the wordmark. -->
+       a small rounded rect so it reads as a flag swatch, set apart from the wordmark. -->
   <defs>
-    <clipPath id="ghFlagClip"><rect x="210" y="6" width="34" height="24" rx="2.5"/></clipPath>
+    <clipPath id="ghFlagClip"><rect x="190" y="6" width="34" height="24" rx="2.5"/></clipPath>
   </defs>
   <g clip-path="url(#ghFlagClip)">
-    <rect x="210" y="6" width="34" height="8" fill="#CE1126"/>
-    <rect x="210" y="14" width="34" height="8" fill="#FCD116"/>
-    <rect x="210" y="22" width="34" height="8" fill="#006B3F"/>
-    <path d="M227,14 L227.94,16.71 L230.80,16.76 L228.52,18.49 L229.35,21.24 L227,19.6 L224.65,21.24 L225.48,18.49 L223.20,16.76 L226.06,16.71 Z" fill="#111111"/>
+    <rect x="190" y="6" width="34" height="8" fill="#CE1126"/>
+    <rect x="190" y="14" width="34" height="8" fill="#FCD116"/>
+    <rect x="190" y="22" width="34" height="8" fill="#006B3F"/>
+    <path d="M207,14 L207.94,16.71 L210.80,16.76 L208.52,18.49 L209.35,21.24 L207,19.6 L204.65,21.24 L205.48,18.49 L203.20,16.76 L206.06,16.71 Z" fill="#111111"/>
   </g>
-  <rect x="210" y="6" width="34" height="24" rx="2.5" fill="none" stroke="currentColor" stroke-opacity="0.15"/>
+  <rect x="190" y="6" width="34" height="24" rx="2.5" fill="none" stroke="currentColor" stroke-opacity="0.15"/>
 </svg>
