@@ -160,8 +160,7 @@ export function RegionPage() {
       REGION_ORDER.includes(region) && React.createElement(DirectAccuracySection, { scope: region }),
       React.createElement("div", { className: "section-heading", style: { marginTop: 14 } }, "Daily Submission — ", region),
       React.createElement(DailySubmissionOverview, { scope: region }),
-      React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Devices with DSRs — by age, ", region),
-      React.createElement(AgingBreakdown, { devices: regionDevices, showDepotColumn: true }),
+      React.createElement(AgingBreakdown, { devices: regionDevices, showDepotColumn: true, heading: "Devices with DSRs — by age, " + region }),
       React.createElement("div", { className: "section-heading", style: { marginTop: 22 } }, "Depots in ", region),
       React.createElement(DepotTable, { depots })),
     showTabs && activeTab === "cce" && React.createElement(CcePerformanceSection, { scope: region }));
