@@ -153,6 +153,12 @@ a{color:var(--accent-strong);}
 .clock-in-box{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.8px;}
 .clock-in-box a{color:var(--accent-strong);}
 
+.clock-in-gate-shell{min-height:50vh;display:flex;align-items:center;justify-content:center;}
+.clock-in-gate-card{width:min(420px,100%);background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px 28px;box-shadow:var(--shadow);text-align:center;}
+.clock-in-gate-icon{font-size:30px;margin-bottom:10px;}
+.clock-in-gate-title{font-weight:700;font-size:18px;margin-bottom:8px;}
+.clock-in-gate-body{font-size:13px;color:var(--text-muted);line-height:1.6;margin-bottom:20px;}
+
 .section-heading{font-size:13px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin:26px 0 12px;}
 .section-heading-row{display:flex;align-items:center;justify-content:space-between;margin:26px 0 12px;}
 .section-heading-row .section-heading{margin:0;}

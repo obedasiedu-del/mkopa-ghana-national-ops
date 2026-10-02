@@ -54,6 +54,22 @@ export function DepotPage() {
   const canWrite = canWriteDepot(auth.role, rec.code, rec.region);
   const haltPhase = activeHaltPhase();
   const haltStatus = haltPhase ? haltStatusForDepot(countsForDevices(ledgerDevices(data.deviceLedger, rec.code)), haltPhase) : null;
+  // A Stock Controller who hasn't clocked in today sees nothing but the gate below -- not
+  // even a collapsed version of her stock data -- so clocking in isn't something she can
+  // just scroll past. The one exception is a live-storage outage (data.dbError): she can't
+  // clock in without a connection either, and trapping her behind a gate she has no way to
+  // clear would be strictly worse than just letting her see whatever's already loaded.
+  const clockInEntry = isScUser ? (data.clockInsByDepot[rec.code] || null) : null;
+  const needsClockIn = isScUser && !rec.isSynthetic && !clockInEntry && !data.dbError;
+
+  if (needsClockIn) {
+    return React.createElement("div", { className: "content" },
+      React.createElement("div", { className: "topbar-row", style: { marginBottom: 4 } },
+        React.createElement("div", null,
+          React.createElement("div", { className: "scope-title" }, rec.name),
+          React.createElement("div", { className: "scope-sub" }, rec.code, " · ", rec.region))),
+      React.createElement(ClockInGate, { rec }));
+  }
 
   return React.createElement("div", { className: "content" },
     React.createElement(Breadcrumb, {
@@ -140,6 +156,35 @@ function ClockInBox({ rec }) {
     mapsLink
       ? React.createElement("a", { href: mapsLink, target: "_blank", rel: "noreferrer" }, "📍 View location")
       : React.createElement("span", { style: { color: "var(--text-faint)" } }, "No location shared"));
+}
+
+// The full-page blockade shown instead of the depot page's own content when the SC hasn't
+// clocked in yet (see needsClockIn above) -- same clock-in action as ClockInBox, just with
+// nothing else on the page to see until it succeeds.
+function ClockInGate({ rec }) {
+  const { data, runAction } = useApp();
+  const [working, setWorking] = React.useState(false);
+
+  async function handleClockIn() {
+    setWorking(true);
+    try {
+      const location = await captureGeolocation();
+      await runAction(
+        () => data.saveClockIn(rec.code, rec.scName, location),
+        location ? "Clocked in" : "Clocked in (no location shared)",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return React.createElement("div", { className: "clock-in-gate-shell" },
+    React.createElement("div", { className: "clock-in-gate-card" },
+      React.createElement("div", { className: "clock-in-gate-icon" }, "⏰"),
+      React.createElement("div", { className: "clock-in-gate-title" }, "Clock in to start"),
+      React.createElement("div", { className: "clock-in-gate-body" },
+        "You haven't clocked in at " + rec.name + " yet today. Clock in to see your stock, submissions and aging."),
+      React.createElement("button", { className: "btn btn-primary", onClick: handleClockIn, disabled: working }, working ? "Clocking in…" : "Clock In Now")));
 }
 
 /* ============ Customer Care Executive panel + CCE KPI tiles ============ */
