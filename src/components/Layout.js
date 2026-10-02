@@ -91,6 +91,10 @@ export function Layout({ children }) {
   return React.createElement("div", { id: "app" },
     React.createElement(Sidebar, null),
     React.createElement("div", { className: "main" },
+      // A faint, fixed watermark of the M-KOPA mark behind every page's data -- decorative
+      // only (aria-hidden, no pointer events), so it never competes with or blocks the real
+      // content stacked above it.
+      React.createElement("div", { className: "watermark", "aria-hidden": "true", style: { backgroundImage: "url(" + mkopaMark + ")" } }),
       React.createElement(Topbar, null),
       data.dbError && React.createElement("div", { className: "content", style: { paddingBottom: 0 } },
         React.createElement("div", { className: "banner", style: { alignItems: "flex-start" } },
