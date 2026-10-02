@@ -294,7 +294,11 @@ input.filter-input[type="date"]{min-width:150px;}
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;}
 @media (max-width: 860px){
   .chart-grid{grid-template-columns:1fr;}
-  .sidebar{position:fixed;left:0;right:0;top:0;height:auto;width:100%;flex-direction:row;overflow-x:auto;overflow-y:hidden;z-index:80;border-right:none;border-bottom:1px solid var(--border);}
+  /* sticky, not fixed -- fixed pulls it out of #app's flow entirely, so .main/.topbar below
+     it never get pushed down and the two rows render stacked on top of each other. sticky
+     reserves its own space in the column flex layout while still pinning to the top on
+     scroll, which is the behavior this was actually going for. */
+  .sidebar{position:sticky;left:0;right:0;top:0;height:auto;width:100%;flex-direction:row;overflow-x:auto;overflow-y:hidden;z-index:80;border-right:none;border-bottom:1px solid var(--border);}
   .sidebar .brand{border-bottom:none;padding:12px 14px;flex:none;}
   .sidebar .nav-section{display:flex;gap:4px;padding:8px 10px;flex:none;}
   .sidebar .nav-label{display:none;}
@@ -303,6 +307,11 @@ input.filter-input[type="date"]{min-width:150px;}
   #app{flex-direction:column;}
   .content{padding:18px 14px 60px;}
   .topbar{padding:14px 14px 0;}
+  /* The role pill + email + two buttons never fit one row under ~500px -- neither had
+     flex-wrap, so they overflowed the viewport instead of dropping to a second line. */
+  .topbar-actions{flex-wrap:wrap;justify-content:flex-end;row-gap:6px;}
+  .user-menu{flex-wrap:wrap;justify-content:flex-end;row-gap:6px;}
+  .user-menu-email{max-width:100%;overflow-wrap:anywhere;}
   .field-grid{grid-template-columns:1fr;}
   .device-model-row, .device-model-head{grid-template-columns:1.1fr 0.8fr 0.8fr 24px;}
   .search-box{min-width:0;flex:1;}
