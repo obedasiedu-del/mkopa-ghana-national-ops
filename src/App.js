@@ -4,16 +4,29 @@ import { AppProvider, useApp } from "./context/AppContext.js";
 import { Layout } from "./components/Layout.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { PendingAccessPage } from "./pages/PendingAccessPage.js";
-import { NationalOverviewPage } from "./pages/NationalOverviewPage.js";
-import { RegionPage } from "./pages/RegionPage.js";
 import { DepotPage } from "./pages/DepotPage.js";
-import { MovementsPage } from "./pages/MovementsPage.js";
-import { AuditPage } from "./pages/AuditPage.js";
-import { HaltReportPage } from "./pages/HaltReportPage.js";
-import { SearchPage } from "./pages/SearchPage.js";
-import { AdminPage } from "./pages/AdminPage.js";
 import { ModalHost } from "./modals/ModalHost.js";
 import { ToastStack } from "./components/ui.js";
+
+// A Stock Controller/CCE (see ScRouter below) never renders any of these -- she's confined
+// to her own DepotPage. Loading them eagerly meant every one of her logins downloaded the
+// full National/Region/Movements/Audit/Halts/Search/Admin bundle (charts, bulk-upload
+// parsers, data tables and all) before she could even clock in, which is real weight on a
+// slow connection. Lazy-loading means her initial bundle is just Login + Layout + DepotPage;
+// a national/regional user pays a brief Suspense flash only the first time she visits each
+// of these, in exchange for not downloading pages she may never open either.
+const NationalOverviewPage = React.lazy(() => import("./pages/NationalOverviewPage.js").then((m) => ({ default: m.NationalOverviewPage })));
+const RegionPage = React.lazy(() => import("./pages/RegionPage.js").then((m) => ({ default: m.RegionPage })));
+const MovementsPage = React.lazy(() => import("./pages/MovementsPage.js").then((m) => ({ default: m.MovementsPage })));
+const AuditPage = React.lazy(() => import("./pages/AuditPage.js").then((m) => ({ default: m.AuditPage })));
+const HaltReportPage = React.lazy(() => import("./pages/HaltReportPage.js").then((m) => ({ default: m.HaltReportPage })));
+const SearchPage = React.lazy(() => import("./pages/SearchPage.js").then((m) => ({ default: m.SearchPage })));
+const AdminPage = React.lazy(() => import("./pages/AdminPage.js").then((m) => ({ default: m.AdminPage })));
+
+function RouteLoading() {
+  return React.createElement("div", { className: "content" },
+    React.createElement("div", { style: { padding: "40px 0", textAlign: "center", color: "var(--text-faint)", fontSize: 13 } }, "Loading…"));
+}
 
 // A Stock Controller (and, identically, a Customer Care Executive) is confined to her own
 // depot page(s) -- everything else (National, Region, Search, Movements/Audit/Halts logs)
@@ -59,8 +72,11 @@ function Shell() {
   if (!auth.session) return React.createElement(LoginPage, null);
   if (!auth.role) return React.createElement(PendingAccessPage, null);
   return React.createElement(React.Fragment, null,
-    React.createElement(Layout, null, React.createElement(Router, null)),
-    React.createElement(ModalHost, null),
+    React.createElement(Layout, null,
+      React.createElement(React.Suspense, { fallback: React.createElement(RouteLoading, null) },
+        React.createElement(Router, null))),
+    React.createElement(React.Suspense, { fallback: null },
+      React.createElement(ModalHost, null)),
     React.createElement(ToastStack, { toasts }));
 }
 
