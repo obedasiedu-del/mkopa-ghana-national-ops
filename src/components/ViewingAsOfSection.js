@@ -109,8 +109,11 @@ export function ViewingAsOfSection({ scope, movements7d }) {
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null || movements7d === undefined ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiCard, { label: "Daily Submission Status", value: dm ? dm.submittedToday + "/" + dm.expectedSubmissions : "—", foot: "depots with today's entry", ...cardExtras("submissionPct") }),
       React.createElement(KpiCard, {
-        label: "Clock-In", value: dm ? dm.clockInOnTime + "/" + dm.clockInTotal : "—",
-        foot: dm ? dm.clockInLate + " late · tap for details" : "",
+        // Headline leads with total clocked in (same "X/Y reporting" shape as Daily
+        // Submission Status above) -- it used to lead with just the on-time count, which
+        // read as "nobody's clocked in" even when everyone had, just late.
+        label: "Clock-In", value: dm ? (dm.clockInOnTime + dm.clockInLate) + "/" + dm.clockInTotal : "—",
+        foot: dm ? dm.clockInOnTime + " on time · " + dm.clockInLate + " late · tap for details" : "",
         onClick: () => openModal("clockInDetail", { scope }), ...cardExtras("clockInOnTimePct"),
       }),
       userIsAdmin && React.createElement(KpiCard, { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", ...cardExtras("agedPct") }),
