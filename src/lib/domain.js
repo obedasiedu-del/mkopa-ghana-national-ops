@@ -249,14 +249,21 @@ export function countsAtDayThreshold(devices, threshold) {
   });
   return n;
 }
-// FIFO Compliance: of the devices that were ALREADY aged (14d+) at the start of a trailing
-// window, what fraction actually got sold (not just reallocated/returned) within that
-// window -- i.e. is aged stock clearing via real sales, not just churning between DSRs.
+// FIFO Compliance: of the devices that reached the aged (14d+) threshold by now -- whether
+// they were already that old or only crossed into it during the trailing window -- what
+// fraction actually got sold (not just reallocated/returned) rather than left sitting.
 // There's no stored daily snapshot of the ledger to check "was this aged N days ago"
-// directly, but a device's allocation date is fixed and never changes, so its age at any
-// past date is reconstructible from that alone -- combined with status_updated_at (when it
-// left the aged pool, if it has), that's enough to place each device relative to the window
-// without needing historical snapshots at all.
+// directly, but a device's initial allocation date is fixed and never changes, so its age at
+// any past date is reconstructible from that alone -- combined with status_updated_at (when
+// it left the aged pool, if it has), that's enough to place each device without needing
+// historical snapshots at all.
+//
+// A device is judged at the moment that matters to it, not at one fixed clock-start for
+// everyone: a still-unresolved device is checked against today (is it aged right now), and a
+// resolved one is checked against its own resolution time (was it already aged when it left).
+// Gating everyone by whether they were aged at the window's start (the original approach)
+// silently dropped devices that crossed into "aged" partway through the window and were sold
+// immediately after -- exactly the fast-clearing behavior this metric exists to reward.
 export function fifoComplianceStats(devices, windowDays = 7, threshold = 14) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -268,19 +275,22 @@ export function fifoComplianceStats(devices, windowDays = 7, threshold = 14) {
   devices.forEach((dv) => {
     const allocDate = agingDate(dv);
     if (!allocDate) return;
-    const daysAtWindowStart = daysAllocated(allocDate, windowStart);
-    if (daysAtWindowStart === null || daysAtWindowStart < threshold) return; // not yet aged when the window opened
 
     if (isResolvedStatus(dv.status)) {
       // Resolved before the window opened, or with no timestamp to place it by, can't be
       // credited (or blamed) for anything that happened during this specific window.
       const resolvedAt = dv.statusUpdatedAt ? new Date(dv.statusUpdatedAt) : null;
       if (!resolvedAt || resolvedAt < windowStart) return;
+      const daysAtResolution = daysAllocated(allocDate, resolvedAt);
+      if (daysAtResolution === null || daysAtResolution < threshold) return; // wasn't aged yet when it left
       cohort++;
       if (dv.status === "sold") sold++;
       return;
     }
-    cohort++; // still sitting unresolved, and was already aged when the window opened
+    // Still sitting unresolved: counts if it's aged as of today, not just as of window start --
+    // it's sitting there right now, unsold, which is exactly what this metric should flag.
+    const daysNow = daysAllocated(allocDate, today);
+    if (daysNow !== null && daysNow >= threshold) cohort++;
   });
   const pct = cohort ? Math.round((sold / cohort) * 1000) / 10 : null;
   return { cohort, sold, pct };
