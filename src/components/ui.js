@@ -34,6 +34,27 @@ export function KpiCard({ label, value, foot, badge, deltaText, sparkPoints, spa
     deltaText && React.createElement("div", { className: "kpi-delta" }, deltaText),
     sparkPoints && React.createElement(Sparkline, { points: sparkPoints, dates: sparkDates, color: sparkColor, isPct }));
 }
+// A card that bundles several related KPI readings under one title instead of giving each
+// its own tile -- used to cut down how many tiles the overview grids show (Stock Snapshot,
+// Today's Reporting, Stock Health, etc.). Each item keeps its own value/foot/badge/onClick,
+// it's just the sparkline/delta-vs-N-days-ago that single KpiCards show which rows drop, to
+// keep a multi-row card from growing taller than the grid around it.
+export function KpiGroupCard({ title, items }) {
+  const rows = items.filter(Boolean);
+  return React.createElement("div", { className: "kpi-tile kpi-group-card" },
+    React.createElement("div", { className: "kpi-group-title" }, title),
+    React.createElement("div", { className: "kpi-group-rows" },
+      rows.map((item, i) => React.createElement("div", {
+        key: i,
+        className: "kpi-group-row" + (item.onClick ? " kpi-group-row-clickable" : ""),
+        onClick: item.onClick, role: item.onClick ? "button" : undefined, tabIndex: item.onClick ? 0 : undefined,
+      },
+        React.createElement("div", { className: "kpi-group-row-main" },
+          React.createElement("span", { className: "kpi-group-row-label" }, item.label),
+          item.badge && React.createElement(Pill, { cls: item.badge.cls }, item.badge.label)),
+        React.createElement("div", { className: "kpi-group-row-value" }, item.value),
+        item.foot && React.createElement("div", { className: "kpi-group-row-foot" }, item.foot)))));
+}
 export function Pill({ cls, children }) {
   return React.createElement("span", { className: "pill " + cls },
     React.createElement("span", { className: "pill-dot" }),

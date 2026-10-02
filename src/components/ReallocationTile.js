@@ -9,8 +9,8 @@ import { ledgerDepotsForScope } from "../lib/selectors.js";
 // global state -- audit_log is unbounded and already fetched on-demand everywhere else in the
 // app (Stock Movement, Audit History), same reasoning here. Counts dsr_name changes; a
 // separate concept from the ledger's existing "Reallocated" status, see isDsrReassignmentRow.
-export function ReallocationTile({ scope, singleDepotCode }) {
-  const { data, openModal } = useApp();
+export function useReallocationCount({ scope, singleDepotCode }) {
+  const { data } = useApp();
   const depotCodes = React.useMemo(
     () => (singleDepotCode ? [singleDepotCode] : ledgerDepotsForScope(data.depots, scope).map((d) => d.code)),
     [data.depots, scope, singleDepotCode],
@@ -26,6 +26,14 @@ export function ReallocationTile({ scope, singleDepotCode }) {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, depotCodes.join(",")]);
+  return count;
+}
+
+// Standalone card, kept for places that don't group KPIs into a shared box (e.g. the depot
+// page's own grid, which has no "Activity & Alerts" group to fold this into).
+export function ReallocationTile({ scope, singleDepotCode }) {
+  const { openModal } = useApp();
+  const count = useReallocationCount({ scope, singleDepotCode });
   return React.createElement(KpiCard, {
     label: "Reallocated (DSR)", value: count === null ? "—" : String(count),
     foot: "moved to a different DSR today · tap for details",
