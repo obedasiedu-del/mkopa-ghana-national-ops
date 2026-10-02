@@ -1,6 +1,7 @@
 "use strict";
 import React from "react";
 import { AppProvider, useApp } from "./context/AppContext.js";
+import { isAdmin } from "./data/useAuth.js";
 import { Layout } from "./components/Layout.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { PendingAccessPage } from "./pages/PendingAccessPage.js";
@@ -57,7 +58,12 @@ function Router() {
   if (route.name === "region") return React.createElement(RegionPage, null);
   if (route.name === "depot") return React.createElement(DepotPage, null);
   if (route.name === "movements") return React.createElement(MovementsPage, null);
-  if (route.name === "audit") return React.createElement(AuditPage, null);
+  // Audit History is a detailed change log -- national_admin and regional_manager (her own
+  // write-scope, same accountability reasoning) get it; "Viewer / Reporting" never had a nav
+  // entry point to it, but with no page-level check here, typing #/audit in the URL bar
+  // worked anyway, since RLS alone let that role's query through. Gating the route itself,
+  // not just the button that links to it, is what actually closes that off.
+  if (route.name === "audit") return (isAdmin(auth.role) || auth.role.role === "regional_manager") ? React.createElement(AuditPage, null) : React.createElement(NationalOverviewPage, null);
   if (route.name === "halts") return React.createElement(HaltReportPage, null);
   if (route.name === "search") return React.createElement(SearchPage, null);
   if (route.name === "admin") return React.createElement(AdminPage, null);

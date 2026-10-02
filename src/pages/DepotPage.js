@@ -15,7 +15,7 @@ import {
   clockInIsLate, mapsLinkForCoords,
 } from "../lib/domain.js";
 
-const DEPOT_TABS = [
+const DEPOT_TABS_BASE = [
   { id: "devices", label: "Devices" },
   { id: "submission", label: "Daily Submission" },
   ...(STOCK_MOVEMENT_ENABLED ? [{ id: "movement", label: "Stock Movement" }] : []),
@@ -26,6 +26,23 @@ const DEPOT_TABS = [
 export function DepotPage() {
   const { data, auth, route, goNational, goRegion, openModal, runAction } = useApp();
   const rec = data.depots[route.depotCode];
+  // A CCE login is confined to her own Service Centre just like a Stock Controller (isSC,
+  // below) is confined to her own depot -- but her page only ever shows CCE things: no
+  // Stock Controller panel, no device/DSR tables, no Stock Movement/Daily Submission tabs,
+  // none of which are hers to see or touch (she gets CceSection instead of DEPOT_TABS
+  // entirely, further down). An admin/regional manager/SC looking at the same depot still
+  // sees all of those.
+  const isCceUser = auth.role && auth.role.role === "cce";
+  // Symmetric to isCceUser: a plain Stock Controller login sees only SC things -- the
+  // Customer Care Executive panel and CCE KPI tiles are someone else's job, same reasoning
+  // as above. An admin/regional manager still sees both, for oversight.
+  const isScUser = auth.role && auth.role.role === "depot_controller";
+  const isSC = isScUser || isCceUser;
+  // Audit History is a raw change log (who edited what, when, old value vs. new) -- an
+  // internal accountability tool for the people overseeing a depot, not something the
+  // depot's own Stock Controller has any use for seeing about her own record. Admins and
+  // regional managers still get it; this only trims it for isScUser.
+  const DEPOT_TABS = isScUser ? DEPOT_TABS_BASE.filter((t) => t.id !== "audit") : DEPOT_TABS_BASE;
   const tab = DEPOT_TABS.some((t) => t.id === route.tab) ? route.tab : "devices";
 
   if (data.loaded && !rec) {
@@ -35,17 +52,6 @@ export function DepotPage() {
   if (!rec) return React.createElement("div", { className: "content" }, "Loading…");
 
   const canWrite = canWriteDepot(auth.role, rec.code, rec.region);
-  const isSC = auth.role && (auth.role.role === "depot_controller" || auth.role.role === "cce");
-  // A CCE login is confined to her own Service Centre just like a Stock Controller (isSC,
-  // above) is confined to her own depot -- but her page only ever shows CCE things: no
-  // Stock Controller panel, no device/DSR tables, no Stock Movement/Daily Submission/Audit
-  // History tabs, none of which are hers to see or touch. An admin/regional manager/SC
-  // looking at the same depot still sees everything, CCE panel included.
-  const isCceUser = auth.role && auth.role.role === "cce";
-  // Symmetric to isCceUser: a plain Stock Controller login sees only SC things -- the
-  // Customer Care Executive panel and CCE KPI tiles are someone else's job, same reasoning
-  // as above. An admin/regional manager still sees both, for oversight.
-  const isScUser = auth.role && auth.role.role === "depot_controller";
   const haltPhase = activeHaltPhase();
   const haltStatus = haltPhase ? haltStatusForDepot(countsForDevices(ledgerDevices(data.deviceLedger, rec.code)), haltPhase) : null;
 
@@ -79,7 +85,7 @@ export function DepotPage() {
             tab === "submission" && React.createElement(SubmissionTab, { rec, canWrite }),
             tab === "movement" && React.createElement(MovementTab, { rec, canWrite }),
             tab === "warehouse" && React.createElement(WarehouseTab, { rec }),
-            tab === "audit" && React.createElement(AuditTab, { rec }))));
+            tab === "audit" && !isScUser && React.createElement(AuditTab, { rec }))));
 }
 
 /* ============ Stock Controller clock-in ============ */
