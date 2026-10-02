@@ -4,7 +4,7 @@ import { useApp } from "../context/AppContext.js";
 import { REGION_ORDER, OTHER_SCOPES, USER_ROLES, dbErrorMessage } from "../lib/domain.js";
 import { depotsForScope, activeDepots } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
-import mkopaMark from "../assets/mkopa-mark.png";
+import mkopaLogo from "../assets/mkopa-logo.svg";
 
 function Sidebar() {
   const { data, auth, route, goNational, goRegion, goAdmin, goDepot } = useApp();
@@ -15,11 +15,8 @@ function Sidebar() {
   const myDepots = isSC ? (auth.role.depotCodes || []).map((c) => data.depots[c]).filter(Boolean) : [];
   return React.createElement("aside", { className: "sidebar" },
     React.createElement("div", { className: "brand" },
-      React.createElement("div", { className: "brand-mark" },
-        React.createElement("img", { className: "brand-icon", src: mkopaMark, alt: "M-KOPA" }),
-        React.createElement("div", null,
-          React.createElement("div", { className: "brand-title" }, "National Retail OPS"),
-          React.createElement("div", { className: "brand-sub" }, "M-KOPA Ghana"))),
+      React.createElement("img", { className: "brand-logo", src: mkopaLogo, alt: "M-KOPA Ghana" }),
+      React.createElement("div", { className: "brand-sub" }, "National Retail OPS"),
     ),
     // A Stock Controller only ever has her own depot(s) to navigate between -- almost always
     // just one, occasionally two for someone who genuinely runs two depots (user_role_depots)
@@ -91,10 +88,10 @@ export function Layout({ children }) {
   return React.createElement("div", { id: "app" },
     React.createElement(Sidebar, null),
     React.createElement("div", { className: "main" },
-      // A faint, fixed watermark of the M-KOPA mark behind every page's data -- decorative
-      // only (aria-hidden, no pointer events), so it never competes with or blocks the real
-      // content stacked above it.
-      React.createElement("div", { className: "watermark", "aria-hidden": "true", style: { backgroundImage: "url(" + mkopaMark + ")" } }),
+      // A faint, fixed watermark of the M-KOPA/Ghana logo behind every page's data --
+      // decorative only (aria-hidden, no pointer events), so it never competes with or
+      // blocks the real content stacked above it.
+      React.createElement("div", { className: "watermark", "aria-hidden": "true", style: { backgroundImage: "url(" + mkopaLogo + ")" } }),
       React.createElement(Topbar, null),
       data.dbError && React.createElement("div", { className: "content", style: { paddingBottom: 0 } },
         React.createElement("div", { className: "banner", style: { alignItems: "flex-start" } },
