@@ -2,6 +2,7 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { KpiTile, KpiCard } from "./ui.js";
+import { ReallocationTile } from "./ReallocationTile.js";
 import { fmtNum, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
 import { overviewStats, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope, clockInStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
@@ -126,6 +127,7 @@ export function ViewingAsOfSection({ scope, movements7d }) {
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: dm ? fmtNum(dm.psdsrDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("psdsrPct") }),
       React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: dm ? fmtNum(dm.inventoryAccuracyDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("inventoryAccuracyPct") }),
       React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", ...cardExtras("fifoPct") }),
+      React.createElement(ReallocationTile, { scope }),
       React.createElement(KpiCard, { label: "Active Depots", value: dm ? fmtNum(dm.activeDepots) : "—", foot: dm ? (dm.totalDepots - dm.activeDepots) + " closed" : "", ...cardExtras("activeDepots") }),
       React.createElement(KpiCard, { label: "SC Coverage", value: dm ? dm.scFilled + "/" + dm.activeDepots : "—", foot: dm ? dm.scVacant + " vacant" : "", ...cardExtras("scCoveragePct") }),
       React.createElement(KpiCard, { label: "Allocation Halts", value: dm ? fmtNum(dm.haltedCount) : "—", foot: haltPhase ? haltPhase.label + " active" : "policy not started", ...cardExtras("haltedCount") })));

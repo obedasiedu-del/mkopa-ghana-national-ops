@@ -2,6 +2,7 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { KpiCard } from "./ui.js";
+import { ReallocationTile } from "./ReallocationTile.js";
 import { fmtNum, fmtDateTime, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS, clockInIsLate } from "../lib/domain.js";
 import { ledgerDevices, latestSubmissionForDepot } from "../lib/selectors.js";
 import { countsForDevices, trueAgePct, submissionTotals, psdsrPct, fifoComplianceStats } from "../lib/domain.js";
@@ -127,5 +128,6 @@ export function DepotViewingAsOfSection({ rec }) {
       }),
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry · tap for names" : "no entry yet", onClick: () => openModal("psdsrDetail", { depotCode: rec.code }), ...cardExtras("psdsrPct") }),
       React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: invAcc ? "latest entry" : "no entry yet", ...cardExtras("inventoryAccuracyPct") }),
-      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", ...cardExtras("fifoPct") })));
+      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", ...cardExtras("fifoPct") }),
+      React.createElement(ReallocationTile, { scope: rec.code, singleDepotCode: rec.code })));
 }

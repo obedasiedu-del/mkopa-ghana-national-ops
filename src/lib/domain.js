@@ -126,6 +126,21 @@ export function mapsLinkForCoords(lat, lng) {
   if (lat === null || lat === undefined || lng === null || lng === undefined) return null;
   return "https://www.google.com/maps?q=" + lat + "," + lng;
 }
+// Detects a device moving to a different DSR between uploads -- NOT the same thing as the
+// ledger's existing "Reallocated" status (set manually via "Mark Reallocated", which nets a
+// device out of aging entirely, same as Sold/Returned). This is pure visibility: the same
+// serial came back in a later upload under a different dsr_name than before. The device
+// stays in_stock and keeps aging normally -- nothing here changes its status, which matters
+// precisely because treating every DSR handoff as "resolved" would let a depot dodge the
+// halt policy by just shuffling a device's DSR name back and forth. Reads off audit_log rows
+// (fetchAuditLog) rather than needing its own table, since the existing device_ledger audit
+// trigger already captures every dsr_name change passively.
+export function isDsrReassignmentRow(row) {
+  if (!row || row.tableName !== "device_ledger" || row.action !== "update") return false;
+  const oldDsr = row.oldValue && row.oldValue.dsr_name ? String(row.oldValue.dsr_name).trim() : "";
+  const newDsr = row.newValue && row.newValue.dsr_name ? String(row.newValue.dsr_name).trim() : "";
+  return !!oldDsr && !!newDsr && oldDsr !== newDsr;
+}
 export function fmtDateShort(iso) {
   if (!iso) return iso;
   const d = new Date(iso + "T00:00:00");
