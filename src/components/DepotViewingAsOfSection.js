@@ -21,7 +21,12 @@ const SNAPSHOT_TARGET_KEYS = ["trueAgePct", "psdsrPct", "inventoryAccuracyPct"];
 // gets the same card National/Region show -- a daily reading (devices aged as of yesterday,
 // sold since), not smoothed into a week.
 export function DepotViewingAsOfSection({ rec }) {
-  const { data, openModal } = useApp();
+  const { data, auth, openModal } = useApp();
+  // The depot's own Stock Controller already gets her clock-in status (time, on-time/late,
+  // map link) from ClockInBox right above this grid on DepotPage -- showing this card to her
+  // too is pure duplication. Admins/regional managers/CCEs viewing this same depot page never
+  // see ClockInBox (clocking in isn't theirs to do), so this card stays their only source for it.
+  const isOwnScUser = auth.role && auth.role.role === "depot_controller";
   const ledgerDvs = ledgerDevices(data.deviceLedger, rec.code);
   const counts = countsForDevices(ledgerDvs);
   const latestSubmission = latestSubmissionForDepot(data.submissionsByDepot, rec.code);
@@ -121,7 +126,7 @@ export function DepotViewingAsOfSection({ rec }) {
         ...cardExtras("aged14Total"),
       }),
       React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
-      React.createElement(KpiCard, {
+      !isOwnScUser && React.createElement(KpiCard, {
         label: "Clock-In", value: !clockInEntry ? "Not yet" : (clockInLate ? "Late" : "On time"),
         foot: clockInEntry ? "at " + fmtDateTime(clockInEntry.clockedInAt) + " · tap for details" : "no entry yet today",
         badge: !clockInEntry ? { label: "NOT YET", cls: "pill-muted" } : (clockInLate ? { label: "LATE", cls: "pill-warning" } : { label: "ON TIME", cls: "pill-success" }),
