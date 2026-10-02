@@ -811,6 +811,30 @@ export function useAppData() {
     }));
   }, []);
 
+  // Clock-ins for any single past (or today's) date -- clockInsByDepot above only ever holds
+  // today's, by design (it's the live figure the KPI cards/realtime refresh track). This is
+  // the on-demand counterpart for "go back and check a specific day," same fetch-on-open
+  // pattern as fetchAuditLog/fetchSnapshotRange rather than holding unbounded history in
+  // global state. Note there's no historical sc_status here -- depots.sc_status is a live
+  // field, not date-stamped, so a past date can't distinguish "on leave" from "no entry" the
+  // way today's view can; the caller just gets who clocked in and when.
+  const fetchClockInsForDate = React.useCallback(async (dateStr, { depotCode, depotCodes } = {}) => {
+    let q = supabaseClient.from("depot_clock_ins").select("*").eq("clock_date", dateStr);
+    if (depotCode) q = q.eq("depot_code", depotCode);
+    else if (depotCodes && depotCodes.length) q = q.in("depot_code", depotCodes);
+    const { data, error } = await q;
+    if (error) throw error;
+    const map = {};
+    (data || []).forEach((r) => {
+      map[r.depot_code] = {
+        clockedInAt: r.clocked_in_at, clockedInBy: r.clocked_in_by || "",
+        lat: r.lat === null ? null : Number(r.lat), lng: r.lng === null ? null : Number(r.lng),
+        accuracyM: r.accuracy_m === null ? null : Number(r.accuracy_m), locationDenied: !!r.location_denied,
+      };
+    });
+    return map;
+  }, []);
+
   return {
     depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot, psdsrDsrsByDepot, clockInsByDepot, inventoryAccuracyByDepot,
     inventoryAccuracyHistory,
@@ -820,7 +844,7 @@ export function useAppData() {
     saveDepotField, saveSubmission,
     saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrDailyBulk, saveClockIn, saveAgedSoldBulk, saveInventoryAccuracyBulk, saveCcePerformanceBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
-    captureSnapshot, fetchSnapshot, fetchSnapshotRange,
+    captureSnapshot, fetchSnapshot, fetchSnapshotRange, fetchClockInsForDate,
     fetchUsers, saveUserRole, removeUserRole,
   };
 }
