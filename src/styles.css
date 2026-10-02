@@ -77,14 +77,12 @@ a{color:var(--accent-strong);}
 .sidebar{
   width:236px; flex:none; background:var(--surface); border-right:1px solid var(--border);
   display:flex; flex-direction:column; position:sticky; top:0; height:100vh; overflow-y:auto;
-  z-index:2; /* above the fixed watermark, which paints over the whole viewport */
 }
 .brand{padding:20px 18px 14px;border-bottom:1px solid var(--border);}
 .brand-mark{display:flex;align-items:center;gap:9px;}
 .brand-icon{
   width:30px;height:30px;object-fit:contain;flex:none;
 }
-.brand-logo{display:block;height:26px;width:auto;max-width:100%;color:var(--text);margin-bottom:5px;}
 .brand-title{font-weight:700;font-size:15px;letter-spacing:-0.01em;}
 .brand-sub{font-size:11.5px;color:var(--text-muted);margin-top:2px;}
 
@@ -102,19 +100,7 @@ a{color:var(--accent-strong);}
 
 .sidebar-footer{margin-top:auto;padding:12px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text-faint);}
 
-.main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;}
-/* Fixed, not scrolled -- stays put as the page scrolls past it, like a stamp on paper.
-   Every page's content sits in .content, which reserves 60px of empty padding at its own
-   bottom (see .content below) specifically so this always has clear room to show in, instead
-   of a centered mark that a dense card grid would cover almost entirely. .topbar and .content
-   sit above it (their own stacking context, below) so it never shows over real data, only in
-   that reserved corner. */
-.watermark{
-  position:fixed; right:22px; bottom:16px; z-index:0; pointer-events:none;
-  width:220px; height:36px;
-  background-repeat:no-repeat; background-position:center; background-size:contain;
-  opacity:0.2;
-}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;}
 .topbar{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border);padding:16px 28px 0;}
 .topbar-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;}
 .scope-title{font-size:21px;font-weight:700;letter-spacing:-0.015em;}
@@ -130,7 +116,7 @@ a{color:var(--accent-strong);}
 .tab-btn:hover{color:var(--text);}
 .tab-btn.active{color:var(--accent-strong);border-bottom-color:var(--accent);font-weight:600;}
 
-.content{padding:22px 28px 60px;flex:1;position:relative;z-index:1;}
+.content{padding:22px 28px 60px;flex:1;}
 
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;}
 .btn:hover{background:var(--surface-2);}
