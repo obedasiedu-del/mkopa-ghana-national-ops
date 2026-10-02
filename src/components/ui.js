@@ -21,9 +21,10 @@ export function KpiTile({ label, value, foot, badge, onClick }) {
 // available (currently just the National page). badge/deltaText/sparkPoints are all optional
 // so a card can render with only the fields its caller actually has.
 export function KpiCard({ label, value, foot, badge, deltaText, sparkPoints, sparkDates, isPct, onClick }) {
-  const sparkColor = badge && badge.cls === "pill-critical" ? "var(--critical)" : "var(--success)";
+  const offTarget = badge && badge.cls === "pill-critical";
+  const sparkColor = offTarget ? "var(--critical)" : "var(--success)";
   return React.createElement("div", {
-    className: "kpi-tile" + (onClick ? " kpi-tile-clickable" : ""),
+    className: "kpi-tile" + (onClick ? " kpi-tile-clickable" : "") + (offTarget ? " kpi-tile-offtarget" : ""),
     onClick, role: onClick ? "button" : undefined, tabIndex: onClick ? 0 : undefined,
   },
     React.createElement("div", { className: "kpi-card-top" },
