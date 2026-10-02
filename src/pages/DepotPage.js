@@ -183,7 +183,7 @@ function ClockInGate({ rec }) {
       React.createElement("div", { className: "clock-in-gate-icon" }, "⏰"),
       React.createElement("div", { className: "clock-in-gate-title" }, "Clock in to start"),
       React.createElement("div", { className: "clock-in-gate-body" },
-        "You haven't clocked in at " + rec.name + " yet today. Clock in to see your stock, submissions and aging."),
+        "You haven't clocked in at " + rec.name + " yet today. Clock in to submit your opening stock, then view your stock and aging."),
       React.createElement("button", { className: "btn btn-primary", onClick: handleClockIn, disabled: working }, working ? "Clocking in…" : "Clock In Now")));
 }
 
