@@ -172,7 +172,13 @@ export function useAppData() {
     const today = todayStr();
     const rows = await fetchAll("depot_clock_ins", null, (q) => q.eq("clock_date", today));
     const map = {};
-    rows.forEach((r) => { map[r.depot_code] = { clockedInAt: r.clocked_in_at, clockedInBy: r.clocked_in_by || "" }; });
+    rows.forEach((r) => {
+      map[r.depot_code] = {
+        clockedInAt: r.clocked_in_at, clockedInBy: r.clocked_in_by || "",
+        lat: r.lat === null ? null : Number(r.lat), lng: r.lng === null ? null : Number(r.lng),
+        accuracyM: r.accuracy_m === null ? null : Number(r.accuracy_m), locationDenied: !!r.location_denied,
+      };
+    });
     setClockInsByDepot(map);
   }, []);
   // Latest weekly Inventory Accuracy entry per depot -- same shape/logic as PSDSR above.
@@ -283,12 +289,13 @@ export function useAppData() {
       tagSource("depots", refreshDepots), tagSource("stock balances", refreshStockBalances),
       tagSource("submissions", refreshSubmissions), tagSource("ledger baseline", refreshLedgerBaseline),
       tagSource("device ledger", refreshDeviceLedger), tagSource("psdsr", refreshPsdsr),
+      tagSource("clock-ins", refreshClockIns),
       tagSource("inventory accuracy", refreshInventoryAccuracy), tagSource("cce performance", refreshCcePerformance),
       tagSource("indirect shops", refreshIndirectShops), tagSource("indirect accuracy", refreshIndirectAccuracy),
     ];
     if (WAREHOUSE_PENDING_ENABLED) tasks.push(tagSource("warehouse pending", refreshWarehousePending));
     return Promise.all(tasks);
-  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshPsdsr, refreshInventoryAccuracy, refreshCcePerformance, refreshIndirectShops, refreshIndirectAccuracy, refreshWarehousePending]);
+  }, [refreshDepots, refreshStockBalances, refreshSubmissions, refreshLedgerBaseline, refreshDeviceLedger, refreshPsdsr, refreshClockIns, refreshInventoryAccuracy, refreshCcePerformance, refreshIndirectShops, refreshIndirectAccuracy, refreshWarehousePending]);
   const loadAll = React.useCallback(async () => {
     try {
       setDbError(null);
@@ -320,7 +327,7 @@ export function useAppData() {
   const refreshers = {
     depots: refreshDepots, stock_movements: refreshStockBalances,
     submissions: refreshSubmissions, device_ledger_baseline: refreshLedgerBaseline, device_ledger: refreshDeviceLedger,
-    psdsr_daily: refreshPsdsr, inventory_accuracy_weekly: refreshInventoryAccuracy,
+    psdsr_daily: refreshPsdsr, depot_clock_ins: refreshClockIns, inventory_accuracy_weekly: refreshInventoryAccuracy,
     cce_performance_weekly: refreshCcePerformance,
     indirect_shops: refreshIndirectShops, indirect_accuracy_weekly: refreshIndirectAccuracy,
     ...(WAREHOUSE_PENDING_ENABLED ? { warehouse_pending_stock: refreshWarehousePending } : {}),
@@ -534,6 +541,30 @@ export function useAppData() {
       return { ...prev, [depotCode]: nextList };
     });
   }, []);
+  // One row per depot per day (unique(depot_code, clock_date)) -- upsert so a Stock
+  // Controller re-tapping "Clock In" (e.g. the first tap's geolocation timed out) replaces
+  // rather than errors on the existing row. `location` is {lat, lng, accuracyM} captured by
+  // the caller via the browser's Geolocation API, or null if denied/unavailable -- that
+  // capture is a UI concern (ties to a user gesture), not this function's job.
+  const saveClockIn = React.useCallback(async (depotCode, clockedInBy, location) => {
+    const clockedInAt = new Date().toISOString();
+    const clockDate = todayStr();
+    const row = {
+      depot_code: depotCode, clock_date: clockDate, clocked_in_at: clockedInAt, clocked_in_by: clockedInBy || "",
+      lat: location ? location.lat : null, lng: location ? location.lng : null,
+      accuracy_m: location ? location.accuracyM : null, location_denied: !location,
+    };
+    const { error } = await supabaseClient.from("depot_clock_ins").upsert(row, { onConflict: "depot_code,clock_date" });
+    if (error) throw error;
+    setClockInsByDepot((prev) => ({
+      ...prev,
+      [depotCode]: {
+        clockedInAt, clockedInBy: clockedInBy || "",
+        lat: location ? location.lat : null, lng: location ? location.lng : null,
+        accuracyM: location ? location.accuracyM : null, locationDenied: !location,
+      },
+    }));
+  }, []);
 
   // Stock Movement and Audit History are fetched on demand (scoped, paginated) rather than
   // held in global state -- both tables grow unboundedly (every device_ledger/depot_stock/
@@ -738,13 +769,13 @@ export function useAppData() {
   }, []);
 
   return {
-    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot, psdsrDsrsByDepot, inventoryAccuracyByDepot,
+    depots, stockBalances, submissionsByDepot, ledgerBaseline, deviceLedger, warehousePending, psdsrByDepot, psdsrDsrsByDepot, clockInsByDepot, inventoryAccuracyByDepot,
     inventoryAccuracyHistory,
     cceByDepot, cceHistory,
     indirectShops, indirectAccuracyByShop, indirectAccuracyHistory,
     loaded, dbError, retryLoad: loadAll, pseudoCodes: PSEUDO_CODES,
     saveDepotField, saveSubmission,
-    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrDailyBulk, saveInventoryAccuracyBulk, saveCcePerformanceBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
+    saveLedgerBaseline, saveLedgerBaselineBulk, saveWarehousePendingBulk, savePsdsrDailyBulk, saveClockIn, saveInventoryAccuracyBulk, saveCcePerformanceBulk, saveIndirectAccuracyBulk, clearAllDeviceLedger, updateDeviceStatus,
     fetchMovements, fetchMovementCount, recordMovement, recordReceiptsBulk, recordMovementsBulk, fetchAuditLog,
     captureSnapshot, fetchSnapshot, fetchSnapshotRange,
     fetchUsers, saveUserRole, removeUserRole,

@@ -2,7 +2,7 @@
 import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { KpiCard } from "./ui.js";
-import { fmtNum, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
+import { fmtNum, fmtDateTime, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS, clockInIsLate } from "../lib/domain.js";
 import { ledgerDevices, latestSubmissionForDepot } from "../lib/selectors.js";
 import { countsForDevices, trueAgePct, submissionTotals, psdsrPct, fifoComplianceStats } from "../lib/domain.js";
 
@@ -27,6 +27,11 @@ export function DepotViewingAsOfSection({ rec }) {
   const subTotals = latestSubmission ? submissionTotals(latestSubmission) : null;
   const invAcc = data.inventoryAccuracyByDepot[rec.code] || null;
   const psdsrRow = data.psdsrByDepot[rec.code] || null;
+  // Today's clock-in only -- not part of the snapshot/sparkline system below (it's a single
+  // daily fact, not a trend worth charting), always reads live regardless of the "Viewing as
+  // of" date picker, same as the PSDSR detail pop-up's "tap for names" always means today's.
+  const clockInEntry = data.clockInsByDepot[rec.code] || null;
+  const clockInLate = clockInEntry ? clockInIsLate(clockInEntry.clockedInAt) : null;
 
   // Daily reading, same as National/Region -- devices already aged as of yesterday, how many
   // have sold since.
@@ -114,6 +119,12 @@ export function DepotViewingAsOfSection({ rec }) {
         ...cardExtras("aged14Total"),
       }),
       React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
+      React.createElement(KpiCard, {
+        label: "Clock-In", value: !clockInEntry ? "Not yet" : (clockInLate ? "Late" : "On time"),
+        foot: clockInEntry ? "at " + fmtDateTime(clockInEntry.clockedInAt) + " · tap for details" : "no entry yet today",
+        badge: !clockInEntry ? { label: "NOT YET", cls: "pill-muted" } : (clockInLate ? { label: "LATE", cls: "pill-warning" } : { label: "ON TIME", cls: "pill-success" }),
+        onClick: () => openModal("clockInDetail", { scope: rec.code }),
+      }),
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry · tap for names" : "no entry yet", onClick: () => openModal("psdsrDetail", { depotCode: rec.code }), ...cardExtras("psdsrPct") }),
       React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: invAcc ? "latest entry" : "no entry yet", ...cardExtras("inventoryAccuracyPct") }),
       React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", ...cardExtras("fifoPct") })));

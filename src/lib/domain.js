@@ -96,7 +96,7 @@ export function kpiBadge(key, value) {
 // isn't confused with a 3-unit swing in a count KPI.
 // Which snapshot metric keys are percentages (drives the "pp" suffix in kpiDeltaText and the
 // axis scale in the sparkline) -- everything else is a plain count.
-export const KPI_PCT_METRICS = { agedPct: true, trueAgePct: true, fifoPct: true, submissionPct: true, scCoveragePct: true, psdsrPct: true, inventoryAccuracyPct: true };
+export const KPI_PCT_METRICS = { agedPct: true, trueAgePct: true, fifoPct: true, submissionPct: true, scCoveragePct: true, psdsrPct: true, inventoryAccuracyPct: true, clockInOnTimePct: true };
 export function kpiDeltaText(diff, isPct, days) {
   if (diff === null || diff === undefined || Number.isNaN(diff)) return null;
   const rounded = Math.round(diff * 10) / 10;
@@ -118,6 +118,13 @@ export function clockInIsLate(clockedInAtIso) {
   const d = new Date(clockedInAtIso);
   if (Number.isNaN(d.getTime())) return null;
   return (d.getUTCHours() * 60 + d.getUTCMinutes()) > CLOCK_IN_WORK_START_HOUR * 60;
+}
+// depots.lat/lng aren't on file for any depot yet, so a clock-in's location is captured and
+// shown (a map link a manager can eyeball), not auto-compared against "the depot's real
+// coordinates" -- that needs real coordinates on record first, which nobody has entered.
+export function mapsLinkForCoords(lat, lng) {
+  if (lat === null || lat === undefined || lng === null || lng === undefined) return null;
+  return "https://www.google.com/maps?q=" + lat + "," + lng;
 }
 export function fmtDateShort(iso) {
   if (!iso) return iso;

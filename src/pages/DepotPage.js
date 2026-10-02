@@ -12,6 +12,7 @@ import {
   SUBMISSION_MODELS, LEDGER_TIERS, LEDGER_TIER_COLOR_VAR, submissionTotals, todayStr,
   fmtDateShort, fmtDateTime, fmtNum, agedPctColor, daysAllocated, agingDate, ledgerTierFor, countsForDevices, trueAgePct, psdsrPct,
   groupDevicesByTier, downloadCsv, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, kpiBadge,
+  clockInIsLate, mapsLinkForCoords,
 } from "../lib/domain.js";
 
 const DEPOT_TABS = [
@@ -66,6 +67,7 @@ export function DepotPage() {
         React.createElement("div", { className: "scope-title" }, rec.name),
         React.createElement("div", { className: "scope-sub" }, rec.code, " · ", rec.region, rec.status === "closed" ? " · Closed" : "")),
       !isCceUser && React.createElement(ScStatusPill, { status: rec.scStatus })),
+    isScUser && !rec.isSynthetic && React.createElement(ClockInBox, { rec }),
     React.createElement(HaltBanner, { status: haltStatus }),
     isCceUser
       ? React.createElement("div", { style: { marginTop: 16 } }, React.createElement(CceSection, { rec, canWrite }))
@@ -78,6 +80,60 @@ export function DepotPage() {
             tab === "movement" && React.createElement(MovementTab, { rec, canWrite }),
             tab === "warehouse" && React.createElement(WarehouseTab, { rec }),
             tab === "audit" && React.createElement(AuditTab, { rec }))));
+}
+
+/* ============ Stock Controller clock-in ============ */
+// Browser Geolocation API, tied to the user's own tap of the button (a user gesture, which
+// is what most browsers require before they'll even show the permission prompt). Resolves
+// null -- never rejects -- on denial, timeout, or an unsupported browser, so the caller
+// always gets a clean "no location" case to fall back to rather than a thrown error.
+function captureGeolocation(timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    let settled = false;
+    const finish = (v) => { if (settled) return; settled = true; resolve(v); };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { clearTimeout(timer); finish({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracyM: pos.coords.accuracy }); },
+      () => { clearTimeout(timer); finish(null); },
+      { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 },
+    );
+  });
+}
+// Shown only to the depot's own Stock Controller login (isScUser) -- Admins/Regional
+// Managers see the roll-up via the Clock-In KPI card in DepotViewingAsOfSection instead,
+// never this button; clocking in isn't theirs to do on someone else's behalf.
+function ClockInBox({ rec }) {
+  const { data, runAction } = useApp();
+  const [working, setWorking] = React.useState(false);
+  const entry = data.clockInsByDepot[rec.code] || null;
+
+  async function handleClockIn() {
+    setWorking(true);
+    try {
+      const location = await captureGeolocation();
+      await runAction(
+        () => data.saveClockIn(rec.code, rec.scName, location),
+        location ? "Clocked in" : "Clocked in (no location shared)",
+      );
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  if (!entry) {
+    return React.createElement("div", { className: "clock-in-box" },
+      React.createElement("div", { style: { flex: 1 } }, "You haven't clocked in today yet."),
+      React.createElement("button", { className: "btn btn-sm", onClick: handleClockIn, disabled: working }, working ? "Clocking in…" : "Clock In"));
+  }
+  const late = clockInIsLate(entry.clockedInAt);
+  const mapsLink = mapsLinkForCoords(entry.lat, entry.lng);
+  return React.createElement("div", { className: "clock-in-box" },
+    React.createElement(Pill, { cls: late ? "pill-warning" : "pill-success" }, late ? "Clocked in late" : "Clocked in on time"),
+    React.createElement("div", { style: { flex: 1 } }, "at " + fmtDateTime(entry.clockedInAt)),
+    mapsLink
+      ? React.createElement("a", { href: mapsLink, target: "_blank", rel: "noreferrer" }, "📍 View location")
+      : React.createElement("span", { style: { color: "var(--text-faint)" } }, "No location shared"));
 }
 
 /* ============ Customer Care Executive panel + CCE KPI tiles ============ */

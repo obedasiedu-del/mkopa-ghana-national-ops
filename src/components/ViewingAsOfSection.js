@@ -3,7 +3,7 @@ import React from "react";
 import { useApp } from "../context/AppContext.js";
 import { KpiTile, KpiCard } from "./ui.js";
 import { fmtNum, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
-import { overviewStats, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope } from "../lib/selectors.js";
+import { overviewStats, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope, clockInStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 
 const SNAPSHOT_RANGE_DAYS = 14;
@@ -17,7 +17,7 @@ const SNAPSHOT_TARGET_KEYS = ["haltedCount", "trueAgePct", "psdsrPct", "inventor
 // `scope` now lets the same picker + card grid live on each Region page too, scoped to that
 // region's own depots via overviewStats(data, scope) etc.
 export function ViewingAsOfSection({ scope, movements7d }) {
-  const { data, auth } = useApp();
+  const { data, auth, openModal } = useApp();
   const stats = overviewStats(data, scope);
   const userIsAdmin = isAdmin(auth.role);
   const haltStatuses = React.useMemo(() => haltStatusesForScope(data, scope), [data, scope]);
@@ -26,11 +26,13 @@ export function ViewingAsOfSection({ scope, movements7d }) {
 
   const psdsr = psdsrStatsForScope(data, scope);
   const invAcc = inventoryAccuracyStatsForScope(data, scope);
+  const clockIn = clockInStatsForScope(data, scope);
   const liveMetrics = React.useMemo(() => ({
     ...snapshotMetricsFromStats(stats, haltedDepots.length),
     psdsrPct: psdsr.pct, psdsrTotal: psdsr.total, psdsrSufficient: psdsr.sufficient, psdsrDepotsReporting: psdsr.depotsReporting,
     inventoryAccuracyPct: invAcc.pct, inventoryAccuracyDepotsReporting: invAcc.depotsReporting,
-  }), [stats, haltedDepots.length, psdsr, invAcc]);
+    clockInOnTime: clockIn.onTime, clockInLate: clockIn.late, clockInTotal: clockIn.totalDepots, clockInOnTimePct: clockIn.pct,
+  }), [stats, haltedDepots.length, psdsr, invAcc, clockIn]);
   const [viewDate, setViewDate] = React.useState(todayStr());
   const isToday = viewDate === todayStr();
   const [rangeSnapshots, setRangeSnapshots] = React.useState([]);
@@ -106,6 +108,11 @@ export function ViewingAsOfSection({ scope, movements7d }) {
       WAREHOUSE_PENDING_ENABLED && React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null || movements7d === undefined ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
       React.createElement(KpiCard, { label: "Daily Submission Status", value: dm ? dm.submittedToday + "/" + dm.expectedSubmissions : "—", foot: "depots with today's entry", ...cardExtras("submissionPct") }),
+      React.createElement(KpiCard, {
+        label: "Clock-In", value: dm ? dm.clockInOnTime + "/" + dm.clockInTotal : "—",
+        foot: dm ? dm.clockInLate + " late · tap for details" : "",
+        onClick: () => openModal("clockInDetail", { scope }), ...cardExtras("clockInOnTimePct"),
+      }),
       userIsAdmin && React.createElement(KpiCard, { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", ...cardExtras("agedPct") }),
       React.createElement(KpiCard, {
         label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—",
