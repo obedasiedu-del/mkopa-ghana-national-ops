@@ -1,5 +1,5 @@
 "use strict";
-import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, REGION_ORDER, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct, SUBMISSION_MODELS } from "./domain.js";
+import { INDIRECT_DEPOT, UNRECOGNISED_DEPOT, REGION_ORDER, countsForDevices, countsAtDayThreshold, fifoComplianceStats, submissionTotals, todayStr, trueAgePct, SUBMISSION_MODELS, clockInIsLate } from "./domain.js";
 import { activeHaltPhase, haltStatusForDepot } from "./haltPolicy.js";
 
 export const PSEUDO_DEPOTS = [INDIRECT_DEPOT, UNRECOGNISED_DEPOT];
@@ -191,6 +191,22 @@ export function psdsrStatsForScope(data, scope) {
     depotsReporting++;
   });
   return { total, sufficient, depotsReporting, totalDepots: depots.length, pct: total ? Math.round((sufficient / total) * 1000) / 10 : null };
+}
+
+// Stock Controller clock-in, today only -- the SC taps "Clock In" on her own depot page each
+// morning (write), Admin/Regional Managers see the roll-up here (read). Denominator is active
+// depots only (closed depots -- 8 nationally as of this write -- have no SC on shift to clock
+// in at all), same reasoning as overviewStats' submittedToday/expectedSubmissions.
+export function clockInStatsForScope(data, scope) {
+  const depots = activeDepots(depotsForScope(data.depots, scope));
+  let onTime = 0, late = 0;
+  depots.forEach((d) => {
+    const row = data.clockInsByDepot[d.code];
+    if (!row) return;
+    if (clockInIsLate(row.clockedInAt)) late++; else onTime++;
+  });
+  const clockedIn = onTime + late;
+  return { onTime, late, clockedIn, totalDepots: depots.length, pct: depots.length ? Math.round((onTime / depots.length) * 1000) / 10 : null };
 }
 
 // Inventory Accuracy has no underlying counted/matched totals to weight by (the source

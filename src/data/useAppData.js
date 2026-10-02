@@ -66,6 +66,7 @@ export function useAppData() {
   const [warehousePending, setWarehousePending] = React.useState({});
   const [psdsrByDepot, setPsdsrByDepot] = React.useState({});
   const [psdsrDsrsByDepot, setPsdsrDsrsByDepot] = React.useState({});
+  const [clockInsByDepot, setClockInsByDepot] = React.useState({});
   const [inventoryAccuracyByDepot, setInventoryAccuracyByDepot] = React.useState({});
   const [inventoryAccuracyHistory, setInventoryAccuracyHistory] = React.useState([]);
   const [cceByDepot, setCceByDepot] = React.useState({});
@@ -163,6 +164,16 @@ export function useAppData() {
     });
     setPsdsrByDepot(byDepot);
     setPsdsrDsrsByDepot(dsrMap);
+  }, []);
+  // Today's clock-ins only -- one row per depot (the unique(depot_code, clock_date)
+  // constraint enforces that), so this is a plain fetch-and-key, no "latest date" lookup
+  // like PSDSR needs (a stale previous day's row would be wrong to show as "clocked in").
+  const refreshClockIns = React.useCallback(async () => {
+    const today = todayStr();
+    const rows = await fetchAll("depot_clock_ins", null, (q) => q.eq("clock_date", today));
+    const map = {};
+    rows.forEach((r) => { map[r.depot_code] = { clockedInAt: r.clocked_in_at, clockedInBy: r.clocked_in_by || "" }; });
+    setClockInsByDepot(map);
   }, []);
   // Latest weekly Inventory Accuracy entry per depot -- same shape/logic as PSDSR above.
   const refreshInventoryAccuracy = React.useCallback(async () => {

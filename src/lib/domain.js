@@ -109,6 +109,16 @@ export function todayStr() {
   const d = new Date();
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+// Stock Controller clock-in: work starts 8:00 AM. Ghana (Africa/Accra) is UTC+0 year-round
+// with no DST, so the UTC hour/minute of the timestamp IS the Ghana wall-clock time -- no
+// Intl/timezone conversion needed, just compare the raw UTC clock.
+export const CLOCK_IN_WORK_START_HOUR = 8;
+export function clockInIsLate(clockedInAtIso) {
+  if (!clockedInAtIso) return null;
+  const d = new Date(clockedInAtIso);
+  if (Number.isNaN(d.getTime())) return null;
+  return (d.getUTCHours() * 60 + d.getUTCMinutes()) > CLOCK_IN_WORK_START_HOUR * 60;
+}
 export function fmtDateShort(iso) {
   if (!iso) return iso;
   const d = new Date(iso + "T00:00:00");
