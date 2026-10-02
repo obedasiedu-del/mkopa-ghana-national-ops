@@ -60,7 +60,18 @@ export function DepotPage() {
   // clock in without a connection either, and trapping her behind a gate she has no way to
   // clear would be strictly worse than just letting her see whatever's already loaded.
   const clockInEntry = isScUser ? (data.clockInsByDepot[rec.code] || null) : null;
-  const needsClockIn = isScUser && !rec.isSynthetic && !clockInEntry && !data.dbError;
+  // A Stock Controller running more than one depot (a handful genuinely do, see
+  // user_role_depots) is still one person -- she can only physically be, and clock in, at one
+  // of them. Clocking in anywhere she's assigned confirms she's at work today, so it should
+  // clear the gate everywhere else she runs too, not just the one depot she happened to open
+  // first. elsewhereEntry is which other depot (if any) already covers her today.
+  let elsewhereCode = null, elsewhereEntry = null;
+  if (isScUser && !clockInEntry) {
+    for (const code of auth.role.depotCodes || []) {
+      if (code !== rec.code && data.clockInsByDepot[code]) { elsewhereCode = code; elsewhereEntry = data.clockInsByDepot[code]; break; }
+    }
+  }
+  const needsClockIn = isScUser && !rec.isSynthetic && !clockInEntry && !elsewhereEntry && !data.dbError;
 
   if (needsClockIn) {
     return React.createElement("div", { className: "content" },
@@ -89,7 +100,7 @@ export function DepotPage() {
         React.createElement("div", { className: "scope-title" }, rec.name),
         React.createElement("div", { className: "scope-sub" }, rec.code, " · ", rec.region, rec.status === "closed" ? " · Closed" : "")),
       !isCceUser && React.createElement(ScStatusPill, { status: rec.scStatus })),
-    isScUser && !rec.isSynthetic && React.createElement(ClockInBox, { rec }),
+    isScUser && !rec.isSynthetic && React.createElement(ClockInBox, { rec, elsewhereCode, elsewhereEntry }),
     React.createElement(HaltBanner, { status: haltStatus }),
     isCceUser
       ? React.createElement("div", { style: { marginTop: 16 } }, React.createElement(CceSection, { rec, canWrite }))
@@ -125,7 +136,7 @@ function captureGeolocation(timeoutMs = 8000) {
 // Shown only to the depot's own Stock Controller login (isScUser) -- Admins/Regional
 // Managers see the roll-up via the Clock-In KPI card in DepotViewingAsOfSection instead,
 // never this button; clocking in isn't theirs to do on someone else's behalf.
-function ClockInBox({ rec }) {
+function ClockInBox({ rec, elsewhereCode, elsewhereEntry }) {
   const { data, runAction } = useApp();
   const [working, setWorking] = React.useState(false);
   const entry = data.clockInsByDepot[rec.code] || null;
@@ -143,6 +154,13 @@ function ClockInBox({ rec }) {
     }
   }
 
+  if (!entry && elsewhereEntry) {
+    const otherName = (data.depots[elsewhereCode] || {}).name || elsewhereCode;
+    const late = clockInIsLate(elsewhereEntry.clockedInAt);
+    return React.createElement("div", { className: "clock-in-box" },
+      React.createElement(Pill, { cls: late ? "pill-warning" : "pill-success" }, late ? "Clocked in late" : "Clocked in on time"),
+      React.createElement("div", { style: { flex: 1 } }, "at " + otherName + ", " + fmtDateTime(elsewhereEntry.clockedInAt) + " -- covers all your depots today"));
+  }
   if (!entry) {
     return React.createElement("div", { className: "clock-in-box" },
       React.createElement("div", { style: { flex: 1 } }, "You haven't clocked in today yet."),
