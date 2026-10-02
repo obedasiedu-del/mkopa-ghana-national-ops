@@ -438,9 +438,16 @@ export function isIndirectChannelShop(shopName) {
   return INDIRECT_CHANNEL_KEYWORDS.some((k) => norm.indexOf(k) !== -1);
 }
 export function classifyShopForLedger(shopName, depotIndex) {
+  // Check indirect-channel keywords BEFORE fuzzy depot matching -- an MTN/Telecel/etc.
+  // partner shop named after the same town as a real depot (e.g. "SC103 MTN BANTAMA
+  // KUMASI" vs. "Bantama Depot") would otherwise fuzzy-match the depot on the shared town
+  // token and silently mix into its ledger, inflating its aged-stock count. This bit Obuasi
+  // once already (fixed by hand in the data) and then recurred on the next upload because
+  // the ordering bug was still here -- every other paste parser in this file already checks
+  // isIndirectChannelShop first; this one hadn't been brought in line.
+  if (isIndirectChannelShop(shopName)) return { code: INDIRECT_DEPOT.code, bucket: "indirect" };
   const depotCode = matchDepotForShop(shopName, depotIndex);
   if (depotCode) return { code: depotCode, bucket: "depot" };
-  if (isIndirectChannelShop(shopName)) return { code: INDIRECT_DEPOT.code, bucket: "indirect" };
   return { code: UNRECOGNISED_DEPOT.code, bucket: "unrecognised" };
 }
 // Splits one big multi-depot paste into per-depot device lists.
@@ -491,6 +498,9 @@ export function normalizeOwnerCode(code) {
 // top of that, before finally bucketing into Indirect Channel / Unrecognised like the device
 // ledger import does.
 export function matchDepotForOwner(code, name, depotIndex) {
+  // Same ordering fix as classifyShopForLedger above: an indirect/partner owner name must
+  // not be allowed to fuzzy-match a real depot on a shared town token.
+  if (isIndirectChannelShop(name) || isIndirectChannelShop(code)) return { code: INDIRECT_DEPOT.code, bucket: "indirect" };
   const byCode = matchDepotForShop(code, depotIndex);
   if (byCode) return { code: byCode, bucket: "depot" };
   const normCode = normalizeOwnerCode(code);
@@ -500,7 +510,6 @@ export function matchDepotForOwner(code, name, depotIndex) {
   }
   const byName = matchDepotForShop(name, depotIndex);
   if (byName) return { code: byName, bucket: "depot" };
-  if (isIndirectChannelShop(name) || isIndirectChannelShop(code)) return { code: INDIRECT_DEPOT.code, bucket: "indirect" };
   return { code: UNRECOGNISED_DEPOT.code, bucket: "unrecognised" };
 }
 const WAREHOUSE_COLUMN_ALIASES = {
