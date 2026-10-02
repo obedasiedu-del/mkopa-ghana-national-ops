@@ -199,16 +199,28 @@ export function psdsrStatsForScope(data, scope) {
 // morning (write), Admin/Regional Managers see the roll-up here (read). Denominator is active
 // depots only (closed depots -- 8 nationally as of this write -- have no SC on shift to clock
 // in at all), same reasoning as overviewStats' submittedToday/expectedSubmissions.
+// A depot whose SC is marked "On Leave" or "Vacant" (depots.sc_status) and hasn't clocked in
+// is counted separately as onLeave, not lumped in with a genuine no-show -- nobody's actually
+// expected to clock in there today. `expected` (totalDepots minus onLeave) is what the on-time
+// percentage is measured against, so a leave-covered depot can't drag the rate down; it still
+// shows up in `onLeave`, visible, rather than silently vanishing from totalDepots itself --
+// that matters because scStatus is editable by the Stock Controller herself (fn_can_write_depot
+// covers her own depot), so a status a depot can self-report must stay auditable, not a way to
+// duck the metric entirely.
 export function clockInStatsForScope(data, scope) {
   const depots = activeDepots(depotsForScope(data.depots, scope));
-  let onTime = 0, late = 0;
+  let onTime = 0, late = 0, onLeave = 0;
   depots.forEach((d) => {
     const row = data.clockInsByDepot[d.code];
-    if (!row) return;
-    if (clockInIsLate(row.clockedInAt)) late++; else onTime++;
+    if (row) { if (clockInIsLate(row.clockedInAt)) late++; else onTime++; return; }
+    if (d.scStatus === "leave" || d.scStatus === "vacant") onLeave++;
   });
   const clockedIn = onTime + late;
-  return { onTime, late, clockedIn, totalDepots: depots.length, pct: depots.length ? Math.round((onTime / depots.length) * 1000) / 10 : null };
+  const expected = depots.length - onLeave;
+  return {
+    onTime, late, onLeave, clockedIn, totalDepots: depots.length, expected,
+    pct: expected ? Math.round((onTime / expected) * 1000) / 10 : null,
+  };
 }
 
 // Inventory Accuracy has no underlying counted/matched totals to weight by (the source

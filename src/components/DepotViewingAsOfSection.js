@@ -38,6 +38,11 @@ export function DepotViewingAsOfSection({ rec }) {
   // of" date picker, same as the PSDSR detail pop-up's "tap for names" always means today's.
   const clockInEntry = data.clockInsByDepot[rec.code] || null;
   const clockInLate = clockInEntry ? clockInIsLate(clockInEntry.clockedInAt) : null;
+  // "Not yet" reads as a no-show; a depot whose SC is marked On Leave/Vacant isn't expected
+  // to clock in today at all, so this card should say that instead -- see clockInStatsForScope
+  // in selectors.js for why the national/region rollup treats this the same way.
+  const scAway = rec.scStatus === "leave" || rec.scStatus === "vacant";
+  const scAwayLabel = rec.scStatus === "leave" ? "On Leave" : "Vacant";
 
   // 7-day rolling clearance rate, same as National/Region -- devices already aged at the
   // start of the window, how many have sold since. See selectors.js's overviewStats for why
@@ -127,9 +132,12 @@ export function DepotViewingAsOfSection({ rec }) {
       }),
       React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
       !isOwnScUser && React.createElement(KpiCard, {
-        label: "Clock-In", value: !clockInEntry ? "Not yet" : (clockInLate ? "Late" : "On time"),
-        foot: clockInEntry ? "at " + fmtDateTime(clockInEntry.clockedInAt) + " · tap for details" : "no entry yet today",
-        badge: !clockInEntry ? { label: "NOT YET", cls: "pill-muted" } : (clockInLate ? { label: "LATE", cls: "pill-warning" } : { label: "ON TIME", cls: "pill-success" }),
+        label: "Clock-In",
+        value: clockInEntry ? (clockInLate ? "Late" : "On time") : (scAway ? scAwayLabel : "Not yet"),
+        foot: clockInEntry ? "at " + fmtDateTime(clockInEntry.clockedInAt) + " · tap for details" : (scAway ? "not expected today · tap for details" : "no entry yet today"),
+        badge: clockInEntry
+          ? (clockInLate ? { label: "LATE", cls: "pill-warning" } : { label: "ON TIME", cls: "pill-success" })
+          : (scAway ? { label: scAwayLabel.toUpperCase(), cls: "pill-muted" } : { label: "NOT YET", cls: "pill-muted" }),
         onClick: () => openModal("clockInDetail", { scope: rec.code }),
       }),
       React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry · tap for names" : "no entry yet", onClick: () => openModal("psdsrDetail", { depotCode: rec.code }), ...cardExtras("psdsrPct") }),

@@ -17,18 +17,21 @@ export function ClockInDetailModal({ scope }) {
   const rows = depots
     .map((d) => {
       const entry = data.clockInsByDepot[d.code] || null;
-      return { depot: d, entry, late: entry ? clockInIsLate(entry.clockedInAt) : null };
+      const away = !entry && (d.scStatus === "leave" || d.scStatus === "vacant");
+      return { depot: d, entry, late: entry ? clockInIsLate(entry.clockedInAt) : null, away, awayLabel: d.scStatus === "leave" ? "On Leave" : "Vacant" };
     })
     .sort((a, b) => a.depot.name.localeCompare(b.depot.name));
   const clockedIn = rows.filter((r) => r.entry);
   const onTime = clockedIn.filter((r) => !r.late);
   const late = clockedIn.filter((r) => r.late);
+  const onLeave = rows.filter((r) => r.away);
+  const expected = rows.length - onLeave.length;
 
   function exportCsv() {
     const out = [["Depot", "Stock Controller", "Time", "Status", "Latitude", "Longitude", "Accuracy (m)"]];
     rows.forEach((r) => out.push([
       r.depot.name, r.depot.scName || "", r.entry ? fmtDateTime(r.entry.clockedInAt) : "",
-      !r.entry ? "Not yet" : (r.late ? "Late" : "On time"),
+      r.entry ? (r.late ? "Late" : "On time") : (r.away ? r.awayLabel : "Not yet"),
       r.entry && r.entry.lat !== null ? r.entry.lat : "", r.entry && r.entry.lng !== null ? r.entry.lng : "",
       r.entry && r.entry.accuracyM !== null ? Math.round(r.entry.accuracyM) : "",
     ]));
@@ -37,9 +40,9 @@ export function ClockInDetailModal({ scope }) {
 
   function renderRow(r) {
     let statusCell;
-    if (!r.entry) statusCell = React.createElement(Pill, { cls: "pill-muted" }, "Not yet");
-    else if (r.late) statusCell = React.createElement(Pill, { cls: "pill-warning" }, "Late");
-    else statusCell = React.createElement(Pill, { cls: "pill-success" }, "On time");
+    if (r.entry) statusCell = React.createElement(Pill, { cls: r.late ? "pill-warning" : "pill-success" }, r.late ? "Late" : "On time");
+    else if (r.away) statusCell = React.createElement(Pill, { cls: "pill-muted" }, r.awayLabel);
+    else statusCell = React.createElement(Pill, { cls: "pill-muted" }, "Not yet");
     const mapsLink = r.entry ? mapsLinkForCoords(r.entry.lat, r.entry.lng) : null;
     let locationCell;
     if (!r.entry) locationCell = React.createElement("span", { style: { color: "var(--text-faint)" } }, "—");
@@ -58,7 +61,7 @@ export function ClockInDetailModal({ scope }) {
     : React.createElement(React.Fragment, null,
       React.createElement("div", { className: "kpi-grid", style: { marginBottom: 14 } },
         React.createElement(KpiTile, { label: "Depots", value: rows.length }),
-        React.createElement(KpiTile, { label: "Clocked in", value: clockedIn.length + " / " + rows.length }),
+        React.createElement(KpiTile, { label: "Clocked in", value: clockedIn.length + " / " + expected, foot: onLeave.length ? onLeave.length + " on leave/vacant, excluded" : undefined }),
         React.createElement(KpiTile, { label: "On time / Late", value: onTime.length + " / " + late.length })),
       React.createElement("div", { style: { display: "flex", justifyContent: "flex-end", marginBottom: 8 } },
         React.createElement("button", { className: "btn btn-sm", onClick: exportCsv }, "📥 Export (CSV)")),

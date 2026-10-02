@@ -32,7 +32,8 @@ export function ViewingAsOfSection({ scope, movements7d }) {
     ...snapshotMetricsFromStats(stats, haltedDepots.length),
     psdsrPct: psdsr.pct, psdsrTotal: psdsr.total, psdsrSufficient: psdsr.sufficient, psdsrDepotsReporting: psdsr.depotsReporting,
     inventoryAccuracyPct: invAcc.pct, inventoryAccuracyDepotsReporting: invAcc.depotsReporting,
-    clockInOnTime: clockIn.onTime, clockInLate: clockIn.late, clockInTotal: clockIn.totalDepots, clockInOnTimePct: clockIn.pct,
+    clockInOnTime: clockIn.onTime, clockInLate: clockIn.late, clockInOnLeave: clockIn.onLeave,
+    clockInTotal: clockIn.totalDepots, clockInExpected: clockIn.expected, clockInOnTimePct: clockIn.pct,
   }), [stats, haltedDepots.length, psdsr, invAcc, clockIn]);
   const [viewDate, setViewDate] = React.useState(todayStr());
   const isToday = viewDate === todayStr();
@@ -113,8 +114,8 @@ export function ViewingAsOfSection({ scope, movements7d }) {
         // Headline leads with total clocked in (same "X/Y reporting" shape as Daily
         // Submission Status above) -- it used to lead with just the on-time count, which
         // read as "nobody's clocked in" even when everyone had, just late.
-        label: "Clock-In", value: dm ? (dm.clockInOnTime + dm.clockInLate) + "/" + dm.clockInTotal : "—",
-        foot: dm ? dm.clockInOnTime + " on time · " + dm.clockInLate + " late · tap for details" : "",
+        label: "Clock-In", value: dm ? (dm.clockInOnTime + dm.clockInLate) + "/" + dm.clockInExpected : "—",
+        foot: dm ? dm.clockInOnTime + " on time · " + dm.clockInLate + " late" + (dm.clockInOnLeave ? " · " + dm.clockInOnLeave + " on leave" : "") + " · tap for details" : "",
         onClick: () => openModal("clockInDetail", { scope }), ...cardExtras("clockInOnTimePct"),
       }),
       userIsAdmin && React.createElement(KpiCard, { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", ...cardExtras("agedPct") }),
