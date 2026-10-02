@@ -1,7 +1,7 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { REGION_ORDER, OTHER_SCOPES, USER_ROLES } from "../lib/domain.js";
+import { REGION_ORDER, OTHER_SCOPES, USER_ROLES, dbErrorMessage } from "../lib/domain.js";
 import { depotsForScope, activeDepots } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
 import mkopaMark from "../assets/mkopa-mark.png";
@@ -96,7 +96,7 @@ export function Layout({ children }) {
         React.createElement("div", { className: "banner", style: { alignItems: "flex-start" } },
           React.createElement("span", null, "⚠"),
           React.createElement("div", { style: { flex: 1 } },
-            React.createElement("div", null, "Can't reach live storage right now — edits here won't be saved until the connection recovers."),
+            React.createElement("div", null, dbErrorMessage(data.dbError)),
             React.createElement("div", { className: "mono", style: { fontSize: 11, opacity: 0.75, marginTop: 4 } }, String(data.dbError.message || data.dbError))),
           React.createElement("button", { className: "btn btn-sm", onClick: () => data.retryLoad(), style: { marginLeft: 12 } }, "Retry"))),
       children));

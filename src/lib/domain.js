@@ -126,6 +126,19 @@ export function mapsLinkForCoords(lat, lng) {
   if (lat === null || lat === undefined || lng === null || lng === undefined) return null;
   return "https://www.google.com/maps?q=" + lat + "," + lng;
 }
+// Not every failed load is actually a connectivity problem. A request that reached Supabase
+// and got rejected there (an RLS policy denying a row, a malformed query, a timeout on the
+// server side) comes back as a structured Postgrest error -- it always carries a `.code`.
+// Only a request that never reached the server at all (device offline, DNS failure, the
+// request timing out before a response) throws a bare error with no `.code` -- that's the
+// only case that's genuinely "can't reach it." Blaming the connection for both gives a false
+// impression on every permissions or query problem, which looks identical to the person
+// seeing it but has nothing to do with their internet.
+export function dbErrorMessage(e) {
+  if (!e) return "Something went wrong loading live data.";
+  if (e.code) return "Live storage responded, but rejected the request -- this is a permissions or data issue, not a connection problem.";
+  return "Can't reach live storage right now -- edits here won't be saved until the connection recovers.";
+}
 // Detects a device moving to a different DSR between uploads -- NOT the same thing as the
 // ledger's existing "Reallocated" status (set manually via "Mark Reallocated", which nets a
 // device out of aging entirely, same as Sold/Returned). This is pure visibility: the same

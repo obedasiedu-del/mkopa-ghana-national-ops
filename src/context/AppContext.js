@@ -29,7 +29,7 @@ export function AppProvider({ children }) {
       if (successMsg) toast(successMsg);
       return r;
     } catch (e) {
-      toast("Failed: " + (e && e.message ? e.message : "try again"));
+      toast("Failed: " + (e && e.message ? e.message : "something went wrong"));
       throw e;
     }
   }, [toast]);
