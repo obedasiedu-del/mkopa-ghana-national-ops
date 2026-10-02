@@ -31,7 +31,11 @@ export function useAuth() {
       const { data: regionRows } = await supabaseClient.from("user_role_regions").select("region").eq("user_id", userId);
       regions = (regionRows || []).map((r) => r.region);
     } else if (data.role === "depot_controller" || data.role === "cce") {
-      const { data: depotRows } = await supabaseClient.from("user_role_depots").select("depot_code").eq("user_id", userId);
+      // Ordered so a Stock Controller running more than one depot sees her main work
+      // station first -- in the sidebar list, and as the one she lands on by default
+      // (ScRouter redirects to depotCodes[0]) -- rather than whatever order the table
+      // happens to return otherwise.
+      const { data: depotRows } = await supabaseClient.from("user_role_depots").select("depot_code").eq("user_id", userId).order("is_primary", { ascending: false });
       depotCodes = (depotRows || []).map((r) => r.depot_code);
     }
     setRole({ role: data.role, regions, depotCodes, depotCode: data.depot_code });
