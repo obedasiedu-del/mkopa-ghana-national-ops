@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 186 36" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 169 36" fill="none">
   <!-- "M-K[O]PA" reads as one continuous word: the green circle sits right where the letter O
        would, touching distance from both "M-K" and "PA", not set apart with its own space.
        Positions here come from the text's actual measured glyph width (getBBox), not a guess:
@@ -17,13 +17,13 @@
   <!-- The Ghana flag itself: red/gold/green horizontal bands with the black star, clipped to
        a small rounded rect so it reads as a flag swatch, set apart from the wordmark. -->
   <defs>
-    <clipPath id="ghFlagClip"><rect x="148" y="6" width="34" height="24" rx="2.5"/></clipPath>
+    <clipPath id="ghFlagClip"><rect x="131" y="6" width="34" height="24" rx="2.5"/></clipPath>
   </defs>
   <g clip-path="url(#ghFlagClip)">
-    <rect x="148" y="6" width="34" height="8" fill="#CE1126"/>
-    <rect x="148" y="14" width="34" height="8" fill="#FCD116"/>
-    <rect x="148" y="22" width="34" height="8" fill="#006B3F"/>
-    <path d="M165,14 L165.94,16.71 L168.80,16.76 L166.52,18.49 L167.35,21.24 L165,19.6 L162.65,21.24 L163.48,18.49 L161.20,16.76 L164.06,16.71 Z" fill="#111111"/>
+    <rect x="131" y="6" width="34" height="8" fill="#CE1126"/>
+    <rect x="131" y="14" width="34" height="8" fill="#FCD116"/>
+    <rect x="131" y="22" width="34" height="8" fill="#006B3F"/>
+    <path d="M148,14 L148.94,16.71 L151.80,16.76 L149.52,18.49 L150.35,21.24 L148,19.6 L145.65,21.24 L146.48,18.49 L144.20,16.76 L147.06,16.71 Z" fill="#111111"/>
   </g>
-  <rect x="148" y="6" width="34" height="24" rx="2.5" fill="none" stroke="currentColor" stroke-opacity="0.15"/>
+  <rect x="131" y="6" width="34" height="24" rx="2.5" fill="none" stroke="currentColor" stroke-opacity="0.15"/>
 </svg>
