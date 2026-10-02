@@ -1,8 +1,8 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { KpiTile, KpiGroupCard } from "./ui.js";
-import { useReallocationCount } from "./ReallocationTile.js";
+import { KpiTile, KpiCard } from "./ui.js";
+import { ReallocationTile } from "./ReallocationTile.js";
 import { fmtNum, WAREHOUSE_PENDING_ENABLED, STOCK_MOVEMENT_ENABLED, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS } from "../lib/domain.js";
 import { overviewStats, haltStatusesForScope, snapshotMetricsFromStats, psdsrStatsForScope, inventoryAccuracyStatsForScope, clockInStatsForScope } from "../lib/selectors.js";
 import { isAdmin } from "../data/useAuth.js";
@@ -93,7 +93,6 @@ export function ViewingAsOfSection({ scope, movements7d }) {
 
   const wh = stats.warehousePendingCounts;
   const allRegionsSuffix = scope === "national" ? ", all regions" : "";
-  const reallocCount = useReallocationCount({ scope });
 
   return React.createElement(React.Fragment, null,
     React.createElement("div", { className: "kpi-datebar" },
@@ -104,57 +103,32 @@ export function ViewingAsOfSection({ scope, movements7d }) {
         dm ? (onTargetCount + offTargetCount) + " KPIs tracked · " + onTargetCount + " on target · " + offTargetCount + " off target" : (rangeLoading ? "Loading…" : "")),
       !isToday && !dm && !rangeLoading && React.createElement("div", { className: "kpi-datebar-note" }, "No snapshot recorded for " + viewDate + " yet — history accumulates day by day from when this was switched on.")),
     React.createElement("div", { className: "kpi-grid" },
-      React.createElement(KpiGroupCard, {
-        title: "Stock Snapshot",
-        items: [
-          { label: "Total Stock", value: dm ? fmtNum(dm.totalStock) : "—", foot: "at depots + with DSRs", badge: cardExtras("totalStock").badge },
-          { label: "Devices at Depots", value: dm ? fmtNum(dm.deviceTotal) : "—", foot: "from daily submissions" + allRegionsSuffix, badge: cardExtras("deviceTotal").badge },
-          { label: "Devices with DSRs", value: dm ? fmtNum(dm.dsrTotal) : "—", foot: "serial-level" + allRegionsSuffix, badge: cardExtras("dsrTotal").badge },
-        ],
-      }),
+      React.createElement(KpiCard, { label: "Total Stock", value: dm ? fmtNum(dm.totalStock) : "—", foot: "at depots + with DSRs", ...cardExtras("totalStock") }),
+      React.createElement(KpiCard, { label: "Devices at Depots", value: dm ? fmtNum(dm.deviceTotal) : "—", foot: "from daily submissions" + allRegionsSuffix, ...cardExtras("deviceTotal") }),
+      React.createElement(KpiCard, { label: "Devices with DSRs", value: dm ? fmtNum(dm.dsrTotal) : "—", foot: "serial-level" + allRegionsSuffix, ...cardExtras("dsrTotal") }),
       WAREHOUSE_PENDING_ENABLED && React.createElement(KpiTile, { label: "In Warehouse (Pending)", value: fmtNum(wh.total), foot: fmtNum(wh.urgent) + " aged 14d+ · not yet at depot" }),
       STOCK_MOVEMENT_ENABLED && React.createElement(KpiTile, { label: "Stock Movement", value: movements7d === null || movements7d === undefined ? "—" : fmtNum(movements7d), foot: "movements in last 7 days" }),
-      React.createElement(KpiGroupCard, {
-        title: "Today's Reporting",
-        items: [
-          { label: "Daily Submission Status", value: dm ? dm.submittedToday + "/" + dm.expectedSubmissions : "—", foot: "depots with today's entry", badge: cardExtras("submissionPct").badge },
-          {
-            // Headline leads with total clocked in (same "X/Y reporting" shape as Daily
-            // Submission Status above) -- it used to lead with just the on-time count, which
-            // read as "nobody's clocked in" even when everyone had, just late.
-            label: "Clock-In", value: dm ? (dm.clockInOnTime + dm.clockInLate) + "/" + dm.clockInTotal : "—",
-            foot: dm ? dm.clockInOnTime + " on time · " + dm.clockInLate + " late · tap for details" : "",
-            onClick: () => openModal("clockInDetail", { scope }), badge: cardExtras("clockInOnTimePct").badge,
-          },
-          { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: dm ? fmtNum(dm.psdsrDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", badge: cardExtras("psdsrPct").badge },
-        ],
+      React.createElement(KpiCard, { label: "Daily Submission Status", value: dm ? dm.submittedToday + "/" + dm.expectedSubmissions : "—", foot: "depots with today's entry", ...cardExtras("submissionPct") }),
+      React.createElement(KpiCard, {
+        // Headline leads with total clocked in (same "X/Y reporting" shape as Daily
+        // Submission Status above) -- it used to lead with just the on-time count, which
+        // read as "nobody's clocked in" even when everyone had, just late.
+        label: "Clock-In", value: dm ? (dm.clockInOnTime + dm.clockInLate) + "/" + dm.clockInTotal : "—",
+        foot: dm ? dm.clockInOnTime + " on time · " + dm.clockInLate + " late · tap for details" : "",
+        onClick: () => openModal("clockInDetail", { scope }), ...cardExtras("clockInOnTimePct"),
       }),
-      React.createElement(KpiGroupCard, {
-        title: "Stock Health",
-        items: [
-          userIsAdmin && { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", badge: cardExtras("agedPct").badge },
-          { label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—", foot: "halt-policy threshold", badge: cardExtras("aged14Total").badge },
-          { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", badge: cardExtras("trueAgePct").badge },
-          { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: dm ? fmtNum(dm.inventoryAccuracyDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", badge: cardExtras("inventoryAccuracyPct").badge },
-          { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", badge: cardExtras("fifoPct").badge },
-        ],
+      userIsAdmin && React.createElement(KpiCard, { label: "Stock Aging", value: dm && dm.agedPct !== null ? dm.agedPct + "%" : "—", foot: dm ? fmtNum(dm.agedTotal) + " devices 10d+" : "", ...cardExtras("agedPct") }),
+      React.createElement(KpiCard, {
+        label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—",
+        foot: "halt-policy threshold",
+        ...cardExtras("aged14Total"),
       }),
-      React.createElement(KpiGroupCard, {
-        title: "Activity & Alerts",
-        items: [
-          {
-            label: "Reallocated (DSR)", value: reallocCount === null ? "—" : String(reallocCount),
-            foot: "moved to a different DSR today · tap for details",
-            onClick: () => openModal("reallocations", { scope }),
-          },
-          { label: "Allocation Halts", value: dm ? fmtNum(dm.haltedCount) : "—", foot: haltPhase ? haltPhase.label + " active" : "policy not started", badge: cardExtras("haltedCount").badge },
-        ],
-      }),
-      React.createElement(KpiGroupCard, {
-        title: "Network Coverage",
-        items: [
-          { label: "Active Depots", value: dm ? fmtNum(dm.activeDepots) : "—", foot: dm ? (dm.totalDepots - dm.activeDepots) + " closed" : "", badge: cardExtras("activeDepots").badge },
-          { label: "SC Coverage", value: dm ? dm.scFilled + "/" + dm.activeDepots : "—", foot: dm ? dm.scVacant + " vacant" : "", badge: cardExtras("scCoveragePct").badge },
-        ],
-      })));
+      React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
+      React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: dm ? fmtNum(dm.psdsrDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("psdsrPct") }),
+      React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: dm ? fmtNum(dm.inventoryAccuracyDepotsReporting) + "/" + fmtNum(stats.activeDepots) + " depots reporting" : "", ...cardExtras("inventoryAccuracyPct") }),
+      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", ...cardExtras("fifoPct") }),
+      React.createElement(ReallocationTile, { scope }),
+      React.createElement(KpiCard, { label: "Active Depots", value: dm ? fmtNum(dm.activeDepots) : "—", foot: dm ? (dm.totalDepots - dm.activeDepots) + " closed" : "", ...cardExtras("activeDepots") }),
+      React.createElement(KpiCard, { label: "SC Coverage", value: dm ? dm.scFilled + "/" + dm.activeDepots : "—", foot: dm ? dm.scVacant + " vacant" : "", ...cardExtras("scCoveragePct") }),
+      React.createElement(KpiCard, { label: "Allocation Halts", value: dm ? fmtNum(dm.haltedCount) : "—", foot: haltPhase ? haltPhase.label + " active" : "policy not started", ...cardExtras("haltedCount") })));
 }

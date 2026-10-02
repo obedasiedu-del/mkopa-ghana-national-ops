@@ -1,8 +1,8 @@
 "use strict";
 import React from "react";
 import { useApp } from "../context/AppContext.js";
-import { KpiGroupCard } from "./ui.js";
-import { useReallocationCount } from "./ReallocationTile.js";
+import { KpiCard } from "./ui.js";
+import { ReallocationTile } from "./ReallocationTile.js";
 import { fmtNum, fmtDateTime, todayStr, addDaysStr, kpiBadge, kpiDeltaText, KPI_PCT_METRICS, clockInIsLate } from "../lib/domain.js";
 import { ledgerDevices, latestSubmissionForDepot } from "../lib/selectors.js";
 import { countsForDevices, trueAgePct, submissionTotals, psdsrPct, fifoComplianceStats } from "../lib/domain.js";
@@ -49,7 +49,6 @@ export function DepotViewingAsOfSection({ rec }) {
   }), [subTotals, counts, psdsrRow, invAcc, fifo]);
 
   const scope = rec.code;
-  const reallocCount = useReallocationCount({ scope: rec.code, singleDepotCode: rec.code });
   const [viewDate, setViewDate] = React.useState(todayStr());
   const isToday = viewDate === todayStr();
   const [rangeSnapshots, setRangeSnapshots] = React.useState([]);
@@ -113,42 +112,22 @@ export function DepotViewingAsOfSection({ rec }) {
         dm ? (onTargetCount + offTargetCount) + " KPIs tracked · " + onTargetCount + " on target · " + offTargetCount + " off target" : (rangeLoading ? "Loading…" : "")),
       !isToday && !dm && !rangeLoading && React.createElement("div", { className: "kpi-datebar-note" }, "No snapshot recorded for " + viewDate + " yet — history accumulates day by day from when this was switched on.")),
     React.createElement("div", { className: "kpi-grid", style: { marginBottom: 16 } },
-      React.createElement(KpiGroupCard, {
-        title: "Stock Snapshot",
-        items: [
-          { label: "Devices at Depot", value: dm ? fmtNum(dm.deviceTotal) : "—", foot: "from daily submission", badge: cardExtras("deviceTotal").badge },
-          { label: "Devices with DSRs", value: dm ? fmtNum(dm.dsrTotal) : "—", foot: "serial-level", badge: cardExtras("dsrTotal").badge },
-        ],
+      React.createElement(KpiCard, { label: "Devices at Depot", value: dm ? fmtNum(dm.deviceTotal) : "—", foot: "from daily submission", ...cardExtras("deviceTotal") }),
+      React.createElement(KpiCard, { label: "Devices with DSRs", value: dm ? fmtNum(dm.dsrTotal) : "—", foot: "serial-level", ...cardExtras("dsrTotal") }),
+      React.createElement(KpiCard, {
+        label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—",
+        foot: "halt-policy threshold",
+        ...cardExtras("aged14Total"),
       }),
-      React.createElement(KpiGroupCard, {
-        title: "Today's Reporting",
-        items: [
-          {
-            label: "Clock-In", value: !clockInEntry ? "Not yet" : (clockInLate ? "Late" : "On time"),
-            foot: clockInEntry ? "at " + fmtDateTime(clockInEntry.clockedInAt) + " · tap for details" : "no entry yet today",
-            badge: !clockInEntry ? { label: "NOT YET", cls: "pill-muted" } : (clockInLate ? { label: "LATE", cls: "pill-warning" } : { label: "ON TIME", cls: "pill-success" }),
-            onClick: () => openModal("clockInDetail", { scope: rec.code }),
-          },
-          { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry · tap for names" : "no entry yet", onClick: () => openModal("psdsrDetail", { depotCode: rec.code }), badge: cardExtras("psdsrPct").badge },
-        ],
+      React.createElement(KpiCard, { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", ...cardExtras("trueAgePct") }),
+      React.createElement(KpiCard, {
+        label: "Clock-In", value: !clockInEntry ? "Not yet" : (clockInLate ? "Late" : "On time"),
+        foot: clockInEntry ? "at " + fmtDateTime(clockInEntry.clockedInAt) + " · tap for details" : "no entry yet today",
+        badge: !clockInEntry ? { label: "NOT YET", cls: "pill-muted" } : (clockInLate ? { label: "LATE", cls: "pill-warning" } : { label: "ON TIME", cls: "pill-success" }),
+        onClick: () => openModal("clockInDetail", { scope: rec.code }),
       }),
-      React.createElement(KpiGroupCard, {
-        title: "Stock Health",
-        items: [
-          { label: "Aged 14d+", value: dm ? fmtNum(dm.aged14Total) : "—", foot: "halt-policy threshold", badge: cardExtras("aged14Total").badge },
-          { label: "True Age", value: dm && dm.trueAgePct !== null ? dm.trueAgePct + "%" : "—", foot: "14d+ share of active (in-trade) stock", badge: cardExtras("trueAgePct").badge },
-          { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: invAcc ? "latest entry" : "no entry yet", badge: cardExtras("inventoryAccuracyPct").badge },
-          { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", badge: cardExtras("fifoPct").badge },
-        ],
-      }),
-      React.createElement(KpiGroupCard, {
-        title: "Activity & Alerts",
-        items: [
-          {
-            label: "Reallocated (DSR)", value: reallocCount === null ? "—" : String(reallocCount),
-            foot: "moved to a different DSR today · tap for details",
-            onClick: () => openModal("reallocations", { scope: rec.code }),
-          },
-        ],
-      })));
+      React.createElement(KpiCard, { label: "PSDSR", value: dm && dm.psdsrPct !== null ? dm.psdsrPct + "%" : "—", foot: psdsrRow ? "latest entry · tap for names" : "no entry yet", onClick: () => openModal("psdsrDetail", { depotCode: rec.code }), ...cardExtras("psdsrPct") }),
+      React.createElement(KpiCard, { label: "Inventory Accuracy", value: dm && dm.inventoryAccuracyPct !== null ? dm.inventoryAccuracyPct + "%" : "—", foot: invAcc ? "latest entry" : "no entry yet", ...cardExtras("inventoryAccuracyPct") }),
+      React.createElement(KpiCard, { label: "FIFO Compliance", value: dm && dm.fifoPct !== null ? dm.fifoPct + "%" : "—", foot: dm ? fmtNum(dm.fifoSold) + "/" + fmtNum(dm.fifoCohort) + " aged stock sold today (of stock aged since yesterday)" : "", ...cardExtras("fifoPct") }),
+      React.createElement(ReallocationTile, { scope: rec.code, singleDepotCode: rec.code })));
 }
