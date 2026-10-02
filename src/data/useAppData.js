@@ -4,18 +4,41 @@ import { supabaseClient } from "../supabaseClient.js";
 import { PSEUDO_CODES, WAREHOUSE_PENDING_ENABLED, todayStr } from "../lib/domain.js";
 
 const PAGE_SIZE = 1000;
-// How many pages of one table are ever in flight at once. warehouse_pending_stock alone is
-// 70,000+ rows (70+ pages) -- firing all of those at once (no cap) hits Supabase's
-// connection pooler hard enough to start failing under load, which is worse than the
-// original one-at-a-time fetch it was meant to replace. A bounded batch keeps the big win
-// (70+ sequential round trips collapse to ~9 batches) without overwhelming the pooler.
-const FETCH_CONCURRENCY = 8;
 
 function buildPageQuery(table, orderCol, from, filterFn) {
   let q = supabaseClient.from(table).select("*").range(from, from + PAGE_SIZE - 1);
   if (filterFn) q = filterFn(q);
   if (orderCol) q = q.order(orderCol, { ascending: true });
   return q;
+}
+// Every table's load (count query + N page queries) used to cap only ITS OWN concurrency --
+// but loadAllTagged() fires ~10 tables at once on every sign-in, each opening its own batch
+// of requests in parallel with no shared limit between them. The true number of simultaneous
+// requests hitting Supabase at login was the sum across every table at once, not bounded by
+// any single table's own cap -- almost certainly why a login could visibly sit for 5-15
+// seconds: requests queuing and contending at the connection pooler, not genuinely slow
+// individual queries (none of these tables are more than a few thousand rows). One gate
+// shared by every query from every table keeps the real total bounded regardless of how many
+// tables are loading at once.
+const GLOBAL_FETCH_CONCURRENCY = 8;
+let globalFetchInFlight = 0;
+const globalFetchQueue = [];
+function acquireFetchSlot() {
+  return new Promise((resolve) => {
+    const tryAcquire = () => {
+      if (globalFetchInFlight < GLOBAL_FETCH_CONCURRENCY) {
+        globalFetchInFlight++;
+        resolve(() => {
+          globalFetchInFlight--;
+          const next = globalFetchQueue.shift();
+          if (next) next();
+        });
+      } else {
+        globalFetchQueue.push(tryAcquire);
+      }
+    };
+    tryAcquire();
+  });
 }
 // On a real mobile connection, a single request dropping mid-flight (no response at all) is
 // often a one-off blip, not a lasting outage -- the same request a couple seconds later
@@ -28,7 +51,12 @@ const FETCH_RETRY_DELAYS_MS = [500, 1500, 3500];
 async function queryWithRetry(buildQuery) {
   let result;
   for (let attempt = 0; ; attempt++) {
-    result = await buildQuery();
+    const release = await acquireFetchSlot();
+    try {
+      result = await buildQuery();
+    } finally {
+      release();
+    }
     if (!result.error || result.error.code) return result;
     if (attempt >= FETCH_RETRY_DELAYS_MS.length) return result;
     await new Promise((resolve) => setTimeout(resolve, FETCH_RETRY_DELAYS_MS[attempt]));
@@ -44,12 +72,11 @@ async function fetchAll(table, orderCol, filterFn) {
   const total = count || 0;
   if (total === 0) return [];
   const pageCount = Math.ceil(total / PAGE_SIZE);
-  const pageRows = new Array(pageCount);
-  await runWithConcurrency(Array.from({ length: pageCount }, (_, p) => p), FETCH_CONCURRENCY, async (p) => {
+  const pageRows = await Promise.all(Array.from({ length: pageCount }, async (_, p) => {
     const { data, error } = await queryWithRetry(() => buildPageQuery(table, orderCol, p * PAGE_SIZE, filterFn));
     if (error) throw error;
-    pageRows[p] = data || [];
-  });
+    return data || [];
+  }));
   const all = [];
   for (const rows of pageRows) all.push(...rows);
   return all;
