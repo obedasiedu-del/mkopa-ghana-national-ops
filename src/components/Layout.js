@@ -59,23 +59,6 @@ function Sidebar() {
     React.createElement("div", { className: "sidebar-footer" }, data.loaded ? "Synced" : (data.dbError ? "Connection error" : "Connecting…")));
 }
 
-// Ghana runs on GMT year-round (no DST), but a staff member's device clock/locale can't be
-// trusted to show that -- pinning the format to the Africa/Accra time zone means everyone
-// sees the same wall-clock time this dashboard's daily cutoffs (submissions, PSDSR, halt
-// snapshots) actually run on, regardless of where they or their phone think they are.
-const CLOCK_FORMAT = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Africa/Accra", weekday: "short", day: "2-digit", month: "short",
-  hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-});
-function LiveClock() {
-  const [now, setNow] = React.useState(() => new Date());
-  React.useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return React.createElement("span", { className: "pill pill-muted mono", title: "Ghana time (GMT)" }, CLOCK_FORMAT.format(now));
-}
-
 function Topbar() {
   const { data, auth, search, setSearch, goSearch, openModal } = useApp();
   const roleLabel = auth.role ? (USER_ROLES.find((r) => r.key === auth.role.role) || {}).label : null;
@@ -96,7 +79,6 @@ function Topbar() {
               React.createElement("line", { x1: "21", y1: "21", x2: "16.65", y2: "16.65" })),
             React.createElement("input", { placeholder: "Search depot, serial or DSR…", value: search, onChange: (e) => setSearch(e.target.value), onKeyDown: onSearchKeyDown })),
       React.createElement("div", { className: "topbar-actions" },
-        React.createElement(LiveClock, null),
         React.createElement("div", { className: "user-menu" },
           roleLabel && React.createElement("span", { className: "pill pill-muted" }, roleLabel),
           React.createElement("span", { className: "user-menu-email" }, auth.user?.email),
