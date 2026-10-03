@@ -448,33 +448,19 @@ export function useAppData(authKey) {
     });
   }, []);
 
-  // Used to be a blind DELETE-then-INSERT per depot on every daily upload -- simple, but it
-  // meant a device that actually sold (and so dropped off the depot's next daily export) was
-  // erased outright rather than ever landing on status='sold'. Nothing leaves a real stock
-  // room except by selling, being returned, or being reallocated elsewhere, and
-  // returns/reallocations already go through their own explicit "Mark Returned"/"Mark
-  // Reallocated" buttons (LedgerModal) -- so a serial that silently disappears from today's
-  // upload, having still been in_stock in yesterday's, is read as sold (the real driver
-  // behind why FIFO Compliance read 0% everywhere: devices weren't un-sellable, they were
-  // being deleted before anything had a chance to mark them). A serial that's already
-  // resolved (sold/returned/reallocated) and still missing is left untouched -- it's already
-  // accounted for, not newly resolved by this upload. Serials still present are upserted by
-  // the (depot_code, serial) unique constraint, same fields as the old insert.
+  // Used to be a blind DELETE-then-INSERT per depot on every daily upload, which erased a
+  // sold device outright rather than ever landing on status='sold'. The fix for that (reading
+  // a serial that silently disappears between uploads as sold) was itself wrong in a
+  // different way: a device just as often disappears because it was returned to the
+  // warehouse, not sold, and the depot's next DSR export has no way to tell the two apart --
+  // guessing "sold" for a returned device wrongly inflates the sold count. Real sales now have
+  // their own authoritative source (the "Upload Aged Sold" button, matched against an actual
+  // external sales-system serial list -- see classifyAgedSoldSerials), and an explicit return
+  // has its own "Mark Returned" button (LedgerModal). A serial missing from today's upload is
+  // left exactly as it was -- status changes only ever come from one of those two explicit
+  // actions, never inferred from who showed up in today's file. Serials still present are
+  // upserted by the (depot_code, serial) unique constraint, same fields as before.
   const writeLedgerBaseline = React.useCallback(async (depotCode, setBy, devicesArr) => {
-    const { data: existing, error: fetchErr } = await supabaseClient
-      .from("device_ledger").select("serial, status").eq("depot_code", depotCode);
-    if (fetchErr) throw fetchErr;
-    const newSerials = new Set(devicesArr.map((d) => d.serial));
-    const statusUpdatedAt = new Date().toISOString();
-    const disappeared = (existing || [])
-      .filter((r) => r.status === "in_stock" && !newSerials.has(r.serial))
-      .map((r) => r.serial);
-    for (const batch of chunkArr(disappeared, 500)) {
-      const { error } = await supabaseClient.from("device_ledger").update({
-        status: "sold", status_updated_at: statusUpdatedAt, status_updated_by: setBy,
-      }).eq("depot_code", depotCode).in("serial", batch);
-      if (error) throw error;
-    }
     if (devicesArr.length) {
       const rows = devicesArr.map((d) => ({
         depot_code: depotCode, serial: d.serial, model: d.model, shop_name: d.shopName,
