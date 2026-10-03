@@ -460,6 +460,11 @@ export function useAppData(authKey) {
   // left exactly as it was -- status changes only ever come from one of those two explicit
   // actions, never inferred from who showed up in today's file. Serials still present are
   // upserted by the (depot_code, serial) unique constraint, same fields as before.
+  // Every batch here is an upsert keyed on (depot_code, serial) -- re-sending the same batch
+  // twice lands on the exact same final rows, so routing it through the same retry-on-
+  // transient-failure gate the read path uses (queryWithRetry/acquireFetchSlot) is safe, not
+  // just convenient. A blocking write the user is staring at a spinner for is a worse place
+  // to let one dropped request fail the whole upload than a background read ever was.
   const writeLedgerBaseline = React.useCallback(async (depotCode, setBy, devicesArr) => {
     if (devicesArr.length) {
       const rows = devicesArr.map((d) => ({
@@ -467,14 +472,14 @@ export function useAppData(authKey) {
         dsr_name: d.dsrName, allocated_date: d.allocatedDate, initial_allocated_date: d.initialAllocatedDate || d.allocatedDate, status: d.status || "in_stock",
       }));
       for (const batch of chunkArr(rows, 500)) {
-        const { error } = await supabaseClient.from("device_ledger").upsert(batch, { onConflict: "depot_code,serial" });
+        const { error } = await queryWithRetry(() => supabaseClient.from("device_ledger").upsert(batch, { onConflict: "depot_code,serial" }));
         if (error) throw error;
       }
     }
-    const { error: baseErr } = await supabaseClient.from("device_ledger_baseline").upsert({
+    const { error: baseErr } = await queryWithRetry(() => supabaseClient.from("device_ledger_baseline").upsert({
       depot_code: depotCode, baseline_set_at: new Date().toISOString(), baseline_set_by: String(setBy).trim(),
       updated_at: new Date().toISOString(),
-    });
+    }));
     if (baseErr) throw baseErr;
   }, []);
   const saveLedgerBaseline = React.useCallback(async (depotCode, setBy, devicesArr) => {
@@ -483,11 +488,19 @@ export function useAppData(authKey) {
     await writeLedgerBaseline(depotCode, setBy, devicesArr);
     await Promise.all([refreshDeviceLedger(), refreshLedgerBaseline()]);
   }, [writeLedgerBaseline, refreshDeviceLedger, refreshLedgerBaseline]);
+  // Used to cap this at 4 depots in flight at once, back when writeLedgerBaseline did a
+  // SELECT-then-conditional-UPDATE-then-upsert per depot (3 serial round trips each) and a
+  // real failure meant a DELETE landing with no replacement INSERT. It's just one upsert per
+  // depot now (see writeLedgerBaseline) -- lighter work, and queryWithRetry's shared gate
+  // already bounds the true number of simultaneous requests across every depot combined, the
+  // same way it does for every table load. A second, tighter cap on top of that just added
+  // dead time: ~100 depots at 4 concurrent meant ~25 sequential rounds for what's now one
+  // upsert each -- most of a national upload's wait was this queueing, not real work.
   const saveLedgerBaselineBulk = React.useCallback(async (setBy, byDepotMap) => {
     if (!setBy || !String(setBy).trim()) throw new Error("Your name is required");
     const codes = Object.keys(byDepotMap);
     if (!codes.length) throw new Error("No matched devices to save yet — check the shop names.");
-    await runWithConcurrency(codes, 4, (code) => writeLedgerBaseline(code, setBy, byDepotMap[code]));
+    await Promise.all(codes.map((code) => writeLedgerBaseline(code, setBy, byDepotMap[code])));
     await Promise.all([refreshDeviceLedger(), refreshLedgerBaseline()]);
     return codes.reduce((sum, c) => sum + byDepotMap[c].length, 0);
   }, [writeLedgerBaseline, refreshDeviceLedger, refreshLedgerBaseline]);
