@@ -51,7 +51,10 @@ export function DepotViewingAsOfSection({ rec }) {
 
   const liveMetrics = React.useMemo(() => ({
     deviceTotal: subTotals ? subTotals.totalStock : 0,
-    dsrTotal: counts.total,
+    // counts.total includes every device ever uploaded for this depot, long-resolved ones
+    // included (see snapshotMetricsFromStats in selectors.js) -- "Devices with DSRs" means
+    // devices with a DSR right now, which is counts.inTrade.
+    dsrTotal: counts.inTrade,
     aged14Total: counts.urgent,
     trueAgePct: trueAgePct(counts),
     psdsrPct: psdsrPct(psdsrRow),

@@ -277,7 +277,13 @@ export function snapshotMetricsFromStats(stats, haltedCount) {
   const submissionPct = stats.expectedSubmissions ? Math.round((stats.submittedToday / stats.expectedSubmissions) * 1000) / 10 : null;
   const scCoveragePct = stats.activeDepots ? Math.round((stats.scFilled / stats.activeDepots) * 1000) / 10 : null;
   return {
-    totalStock: stats.deviceTotal + c.total, deviceTotal: stats.deviceTotal, dsrTotal: c.total,
+    // c.total counts every device_ledger row ever uploaded, including ones long since sold,
+    // returned, or reallocated -- writeLedgerBaseline marks a vanished serial "sold" rather
+    // than deleting it (so FIFO Compliance can credit it), but that means the row never
+    // leaves the table. "Devices with DSRs" and "Total Stock" both mean devices that ARE
+    // currently with a DSR right now, which is c.inTrade -- c.total would silently accumulate
+    // every previous day's resolved devices on top of today's real count forever.
+    totalStock: stats.deviceTotal + c.inTrade, deviceTotal: stats.deviceTotal, dsrTotal: c.inTrade,
     agedPct, agedTotal: stats.aged10Plus, aged14Total: c.urgent, trueAgePct: trueAgePct(c),
     fifoPct: stats.fifoCompliance.pct, fifoCohort: stats.fifoCompliance.cohort, fifoSold: stats.fifoCompliance.sold,
     activeDepots: stats.activeDepots, totalDepots: stats.totalDepots,
